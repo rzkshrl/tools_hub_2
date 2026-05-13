@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tools Hub</title>
+
+<link rel="stylesheet" href="/public/assets/css/style_home.css">
+
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+
+<div id="loader">
+  <div class="spin"></div>
+  <div class="spin-label" id="loaderLabel">Memuat tool...</div>
+</div>
+
+<!-- Status bar preload libs -->
+<div id="preloadBar">
+  <div class="preload-dot"></div>
+  <span id="preloadMsg">Memuat library di background...</span>
+</div>
+
+<div id="backBar">
+  <button id="backBtn" onclick="showDashboard()">← Dashboard</button>
+  <span id="backLabel"></span>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <header class="hub-header">
+    <div class="logo">🧰</div>
+    <div class="htext">
+      <h1>Tools Hub</h1>
+      <p>Kumpulan tools untuk operasional toko</p>
+    </div>
+    <div class="hbadge">3 Tools</div>
+  </header>
+
+  <main class="hub-main">
+    <div class="hero">
+      <h2>Selamat datang! 👋</h2>
+      <p>Pilih tool di bawah</p>
+    </div>
+
+    <div class="sec-label">Pilih Tool</div>
+    <div class="tools-grid">
+      <div class="tc" id="card-konversi" onclick="loadPage('konversi_satuan')" style="--cc:#236b42;--ic:#e6f3ec;">
+        <div class="tc-icon">📦</div>
+        <div>
+          <div class="tc-title">Konversi Satuan → Dus</div>
+          <div class="tc-desc">Upload Excel/CSV dan konversi satuan pcs/bungkus ke dus dengan aturan kustom per produk.</div>
+          <div class="tc-tags"><span class="tc-tag">Excel / CSV</span><span class="tc-tag">Konversi</span><span class="tc-tag">Export</span></div>
+        </div>
+        <span class="tc-arr">↗</span>
+      </div>
+
+      <div class="tc" id="card-collect" onclick="loadPage('collect_db')" style="--cc:#1756a0;--ic:#e8f1fc;">
+        <div class="tc-icon">🗃️</div>
+        <div>
+          <div class="tc-title">Collect DB — Merger</div>
+          <div class="tc-desc">Gabungkan beberapa file Excel/CSV distributor menjadi satu database stok yang bersih.</div>
+          <div class="tc-tags"><span class="tc-tag">Multi-file</span><span class="tc-tag">Merge</span><span class="tc-tag">Database</span></div>
+        </div>
+        <span class="tc-arr">↗</span>
+      </div>
+
+      <div class="tc" id="card-matcher" onclick="loadPage('stock_name_matcher')" style="--cc:#5b3ea8;--ic:#f0ecfb;">
+        <div class="tc-icon">🔍</div>
+        <div>
+          <div class="tc-title">Stock Name Matcher</div>
+          <div class="tc-desc">Cocokkan nama barang dari distributor secara otomatis dengan fuzzy matching.</div>
+          <div class="tc-tags"><span class="tc-tag">Fuzzy Match</span><span class="tc-tag">Stok</span><span class="tc-tag">Gratis</span></div>
+        </div>
+        <span class="tc-arr">↗</span>
+      </div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px;">Referensi</div>
+    <div class="tools-grid" style="margin-bottom:32px;">
+      <div class="tc" id="card-panduan" onclick="loadPage('panduan_konversi')" style="--cc:#a85c08;--ic:#fef5e9;">
+        <div class="tc-icon">📖</div>
+        <div>
+          <div class="tc-title">Panduan Konversi Satuan</div>
+          <div class="tc-desc">Dokumentasi lengkap cara menggunakan fitur konversi satuan ke dus.</div>
+          <div class="tc-tags"><span class="tc-tag">Panduan</span><span class="tc-tag">Dokumentasi</span></div>
+        </div>
+        <span class="tc-arr">↗</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- TOOL CONTAINER -->
+<div id="toolView"></div>
+</body>
+</html>

@@ -1,34 +1,46 @@
-// Ekstrak <style>, ext <script src>, dan <body> content
-// agar aman di-inject via innerHTML (browser drop <head> jika nested)
-function processToolHtml_(html) {
-  // Ambil semua blok <style>
-  var styleMatches = [];
-  var styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  var m;
-  while ((m = styleRe.exec(html)) !== null) {
-    styleMatches.push(m[1]);
-  }
-  var styleBlock = styleMatches.length
-    ? '<style>' + styleMatches.join('\n') + '</style>'
-    : '';
+window.addEventListener("DOMContentLoaded", () => {
 
-  // Ambil semua external script src dari <head>
-  var extSrcs = [];
-  var headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
-  if (headMatch) {
-    var headHtml = headMatch[1];
-    var extRe = /<script[^>]+src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
-    while ((m = extRe.exec(headHtml)) !== null) {
-      extSrcs.push(m[1]);
+  const app = document.getElementById("app");
+
+  async function loadPage(page, addToHistory = true) {
+    try {
+
+      const response = await fetch(`/public/pages/${page}.html`);
+
+      if (!response.ok) {
+        throw new Error("Page not found");
+      }
+
+      const html = await response.text();
+
+      app.innerHTML = html;
+
+      if (addToHistory) {
+        history.pushState({ page }, "", `#${page}`);
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      app.innerHTML = `
+        <div style="padding:40px">
+          <h2>Page not found</h2>
+        </div>
+      `;
     }
   }
-  var extBlock = extSrcs.map(function(src) {
-    return '<script src="' + src + '"></script>';
-  }).join('\n');
 
-  // Ambil konten <body>
-  var bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  var bodyContent = bodyMatch ? bodyMatch[1].trim() : html;
+  window.loadPage = loadPage;
 
-  return styleBlock + '\n' + extBlock + '\n' + bodyContent;
-}
+  loadPage("home");
+
+  window.addEventListener("popstate", (event) => {
+
+    const page = event.state?.page || "home";
+
+    loadPage(page, false);
+
+  });
+
+});
