@@ -62,5 +62,5 @@ window.addEventListener("DOMContentLoaded", () => {
 
   window.loadPage = loadPage;
 
-  loadPage("/pages/home.html");
+  loadPage("home");
 });
