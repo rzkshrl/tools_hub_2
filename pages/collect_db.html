@@ -618,6 +618,36 @@
         ];
       }
 
+      // English month names → index (for distributors with EN locale data, e.g. MJAP)
+      const MONTH_EN = [
+        "JANUARY",
+        "FEBRUARY",
+        "MARCH",
+        "APRIL",
+        "MAY",
+        "JUNE",
+        "JULY",
+        "AUGUST",
+        "SEPTEMBER",
+        "OCTOBER",
+        "NOVEMBER",
+        "DECEMBER",
+      ];
+      const MONTH_EN_SHORT = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+      ];
+
       // Normalize month string to index (0-11), returns -1 if unrecognized
       function parseMonthIdx(s) {
         if (!s) return -1;
@@ -626,7 +656,12 @@
         if (fullIdx >= 0) return fullIdx;
         const shortIdx = MONTH_SHORT.findIndex((m) => m === t.slice(0, 3));
         if (shortIdx >= 0) return shortIdx;
-        // Try partial
+        // Try English month names (e.g. "January", "Jan 2026")
+        const enFull = MONTH_EN.findIndex((m) => t.startsWith(m));
+        if (enFull >= 0) return enFull;
+        const enShort = MONTH_EN_SHORT.findIndex((m) => t.startsWith(m));
+        if (enShort >= 0) return enShort;
+        // Try partial Indonesian
         const partial = MONTH_NAMES.findIndex((m) =>
           m.toUpperCase().startsWith(t.slice(0, 3)),
         );
@@ -1095,6 +1130,9 @@
         if (typeof v === "string") {
           const t = v.trim();
           if (/^\d+$/.test(t)) return MONTH_NAMES[parseInt(t) - 1] || t;
+          // Normalize English month names → Indonesian (e.g. "January" → "Januari", "Jan 2026" → "Januari")
+          const idx = parseMonthIdx(t);
+          if (idx >= 0) return MONTH_NAMES[idx];
           return t;
         }
         return v || "";
@@ -1140,8 +1178,26 @@
             raw: true,
           });
           if (data.length > 1) {
-            const hdr = data[0] || [];
+            const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
             const isSAJ = str(hdr[0]).toLowerCase().includes("cabang");
+            // Detect format by header:
+            // Format A (UD Sejahtera): Nomor#, Tanggal, Kode#, Nama Barang, Kuantitas, Satuan, @Harga, Penjualan, DPP, Bulan, Nama Pelanggan...
+            // Format B (generic): col[4]=Nama Pelanggan, col[8]=Nama Barang, dll
+            const custIdx = hdr.findIndex(
+              (h) => h.includes("NAMA PELANGGAN") || h.includes("CUSTOMER"),
+            );
+            const brgIdx = hdr.findIndex(
+              (h) => h.includes("NAMA BARANG") || h.includes("PRODUK"),
+            );
+            const blnIdx = hdr.findIndex((h) => h === "BULAN" || h === "BLN");
+            const qtyIdx = hdr.findIndex(
+              (h) => h === "KUANTITAS" || h === "QTY",
+            );
+            const satIdx = hdr.findIndex((h) => h === "SATUAN" || h === "SAT");
+            // DPP col: prefer "PENJUALAN" (numeric) over "DPP" (may contain formula)
+            const jmlIdx = hdr.findIndex(
+              (h) => h === "PENJUALAN" || h === "DPP" || h.includes("JUMLAH"),
+            );
             rows = data
               .slice(1)
               .filter((r) => r.some((v) => v != null))
@@ -1156,7 +1212,22 @@
                     satuan: str(col(r, 8)),
                     jumlah: col(r, 10),
                   };
+                else if (custIdx >= 0 && brgIdx >= 0)
+                  // Format A: header-detected (e.g. UD Sejahtera)
+                  return {
+                    dist: distName,
+                    cust: str(col(r, custIdx)),
+                    bulan:
+                      blnIdx >= 0
+                        ? getMonthName(str(col(r, blnIdx)))
+                        : getMonthName(xlsxDateToJS(col(r, 1))),
+                    barang: str(col(r, brgIdx)),
+                    qty: qtyIdx >= 0 ? col(r, qtyIdx) : col(r, 4),
+                    satuan: satIdx >= 0 ? str(col(r, satIdx)) : str(col(r, 5)),
+                    jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : col(r, 7),
+                  };
                 else
+                  // Format B: legacy fixed-index fallback
                   return {
                     dist: distName,
                     cust: str(col(r, 4)),
@@ -1187,7 +1258,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, 2)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1225,7 +1296,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 5)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, 11)),
                 qty: col(r, 14),
                 satuan: str(col(r, 15)),
@@ -1263,7 +1334,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 6)),
-                bulan: str(col(r, 4)),
+                bulan: getMonthName(str(col(r, 4))),
                 barang: str(col(r, 8)),
                 qty: col(r, 9),
                 satuan: str(col(r, 10)),
@@ -1282,7 +1353,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 2)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1359,7 +1430,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, 3)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1382,7 +1453,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, custIdx)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, brgIdx >= 0 ? brgIdx : 5)),
                 qty: col(r, qtyIdx),
                 satuan: str(col(r, satIdx >= 0 ? satIdx : qtyIdx + 1)),
@@ -1398,7 +1469,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, custIdx >= 0 ? custIdx : 10)),
-                bulan: str(col(r, 1)),
+                bulan: getMonthName(str(col(r, 1))),
                 barang: str(col(r, 5)),
                 qty: col(r, qtyIdx >= 0 ? qtyIdx : 12),
                 satuan: str(col(r, satIdx >= 0 ? satIdx : 13)),
@@ -1456,7 +1527,7 @@
                   .map((r) => ({
                     dist: dn,
                     cust: str(col(r, custIdx)),
-                    bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
+                    bulan: blnIdx >= 0 ? getMonthName(str(col(r, blnIdx))) : "",
                     barang: str(col(r, brgIdx)),
                     qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
                     satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
@@ -1554,7 +1625,7 @@
                 .map((r) => ({
                   dist: distName,
                   cust: str(col(r, custIdx)),
-                  bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
+                  bulan: blnIdx >= 0 ? getMonthName(str(col(r, blnIdx))) : "",
                   barang: str(col(r, brgIdx)),
                   qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
                   satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
