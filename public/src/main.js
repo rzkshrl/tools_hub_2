@@ -3,7 +3,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   async function loadPage(page, addToHistory = true) {
     try {
-      const response = await fetch(`/public/pages/${page}.html`);
+      const response = await fetch(`/pages/${page}.html`);
 
       if (!response.ok) {
         throw new Error("Page not found");
