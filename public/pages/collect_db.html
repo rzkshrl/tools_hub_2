@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Collect DB — Merger Tool</title>
+    <title>Collect DB — RO Merger Tool</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link
@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/assets/css/style_collect_db.css" />
   </head>
   <body>
+    Í
     <div class="app">
       <div class="app-header">
         <h1>
@@ -21,11 +22,11 @@
             aria-hidden="true"
             style="font-size: 20px; vertical-align: -2px; margin-right: 6px"
           ></i
-          >Collect DB — Merger Tool
+          >Collect DB — RO Merger Tool
         </h1>
         <p>
-          Upload file .zip berisi data distributor, atur kolom, lalu export ke
-          Excel
+          Upload file .zip berisi data distributor, pilih DB &amp; periode, lalu
+          export ke Excel format RO
         </p>
       </div>
 
@@ -33,11 +34,11 @@
       <div class="steps">
         <div class="step active" id="step-1">
           <div class="step-num">1</div>
-          <span>Upload ZIP</span>
+          <span>Upload &amp; Pilih DB</span>
         </div>
         <div class="step" id="step-2">
           <div class="step-num">2</div>
-          <span>Atur Kolom</span>
+          <span>Periode &amp; Kolom</span>
         </div>
         <div class="step" id="step-3">
           <div class="step-num">3</div>
@@ -49,7 +50,7 @@
         </div>
       </div>
 
-      <!-- SECTION 1: Upload -->
+      <!-- ══════════════ SECTION 1: Upload & DB Selection ══════════════ -->
       <div id="sec-upload" class="section">
         <div class="card">
           <div class="card-title">
@@ -74,7 +75,7 @@
               <strong onclick="document.getElementById('file-input').click()"
                 >Klik untuk pilih file</strong
               >
-              atau seret & lepas di sini
+              atau seret &amp; lepas di sini
             </p>
             <p style="font-size: 12px; color: var(--text3); margin-top: 6px">
               Format: .zip &nbsp;·&nbsp; Maks. 200 MB
@@ -102,22 +103,206 @@
               style="margin-top: 0.75rem; font-size: 13px; color: var(--text2)"
             ></div>
           </div>
+        </div>
+
+        <!-- ══ DB Selection Card (muncul setelah ZIP dibaca) ══ -->
+        <div id="db-sel-card" class="card hidden">
+          <div class="card-title">
+            <i class="ti ti-database-import" aria-hidden="true"></i>Pilih
+            Distributor (DB)
+          </div>
+          <div class="card-sub">
+            Centang distributor yang akan diproses. Semua terpilih secara
+            default.
+          </div>
+
+          <div class="db-sel-bar">
+            <button class="db-sel-btn" id="btn-sel-all">
+              <i class="ti ti-checkbox"></i> Pilih Semua
+            </button>
+            <button class="db-sel-btn" id="btn-sel-none">
+              <i class="ti ti-square"></i> Batal Semua
+            </button>
+            <span class="sel-count" id="sel-count-label">0 / 0 dipilih</span>
+          </div>
+
+          <div class="db-list" id="db-list"></div>
+
+          <!-- ── Template acuan (OPSIONAL) ── -->
+          <div class="section-divider" style="margin-top: 1.25rem">
+            <hr />
+            <span
+              >Template Acuan
+              <em style="font-weight: 400; color: var(--text3)"
+                >(opsional)</em
+              ></span
+            >
+            <hr />
+          </div>
+
+          <div
+            style="font-size: 13px; color: var(--text2); margin-bottom: 0.5rem"
+          >
+            Upload file Excel acuan (format RO) untuk menentukan
+            <strong>urutan distributor</strong> pada output.
+          </div>
+
+          <div id="tpl-drop-zone" class="tpl-zone">
+            <i class="ti ti-table-import" aria-hidden="true"></i>
+            <div class="tpl-zone-text">
+              <p><strong>Klik atau seret file Excel acuan di sini</strong></p>
+              <p>
+                Sheet1 = urutan distributor &nbsp;·&nbsp; Sheet lain = format
+                data RO
+              </p>
+            </div>
+          </div>
+          <input
+            type="file"
+            id="tpl-file-input"
+            accept=".xlsx,.xls"
+            style="display: none"
+          />
+
+          <div id="tpl-selected" class="hidden">
+            <div class="tpl-info">
+              <i class="ti ti-file-spreadsheet"></i>
+              <div class="tpl-info-text">
+                <span
+                  id="tpl-file-name"
+                  style="font-size: 13px; font-weight: 500; color: var(--green)"
+                  >-</span
+                >
+                <span id="tpl-file-meta">-</span>
+              </div>
+              <button
+                class="tpl-remove"
+                id="btn-remove-tpl"
+                title="Hapus template"
+              >
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+            <div id="tpl-preview-panel" class="tpl-preview hidden">
+              <div class="tpl-preview-title">
+                <i class="ti ti-list-numbers" style="font-size: 14px"></i>
+                Urutan Distributor (dari Sheet1)
+              </div>
+              <div class="tpl-dist-list" id="tpl-dist-list"></div>
+              <div class="tpl-months" id="tpl-months-info"></div>
+            </div>
+          </div>
 
           <div class="btn-row">
             <button class="btn btn-primary" id="btn-next-1" disabled>
-              Lanjut ke Atur Kolom <i class="ti ti-arrow-right"></i>
+              Lanjut ke Periode &amp; Kolom <i class="ti ti-arrow-right"></i>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- SECTION 2: Column config -->
+      <!-- ══════════════ SECTION 2: Period & Column config ══════════════ -->
       <div id="sec-columns" class="section hidden">
+        <!-- Periode RO -->
+        <div class="period-card">
+          <div class="period-card-title">
+            <i class="ti ti-calendar-stats" aria-hidden="true"></i>Periode
+            Triwulan RO
+          </div>
+          <div
+            style="
+              font-size: 13px;
+              color: var(--text2);
+              margin-bottom: 0.875rem;
+            "
+          >
+            Tentukan bulan-bulan yang masuk dalam perhitungan RO. Logika
+            triwulan: bulan target + 2 bulan sebelumnya.
+          </div>
+
+          <div class="period-mode-group">
+            <button
+              class="period-mode-btn selected"
+              id="pmb-auto"
+              onclick="setPeriodMode('auto')"
+            >
+              <div class="pmb-title">
+                <i class="ti ti-calendar-bolt" style="font-size: 14px"></i>
+                Otomatis (Triwulan)
+              </div>
+              <div class="pmb-desc">
+                Pilih bulan target RO — sistem hitung 3 bulan otomatis
+              </div>
+            </button>
+            <button
+              class="period-mode-btn"
+              id="pmb-manual"
+              onclick="setPeriodMode('manual')"
+            >
+              <div class="pmb-title">
+                <i class="ti ti-calendar-event" style="font-size: 14px"></i>
+                Manual
+              </div>
+              <div class="pmb-desc">
+                Pilih sendiri bulan mana saja yang dimasukkan
+              </div>
+            </button>
+          </div>
+
+          <!-- Auto mode -->
+          <div id="period-auto-wrap" class="period-auto-wrap">
+            <div class="target-month-row">
+              <label>Bulan RO yang dicari:</label>
+              <select id="sel-target-month" onchange="onTargetMonthChange()">
+                <option value="">— pilih bulan —</option>
+                <option value="0">Januari</option>
+                <option value="1">Februari</option>
+                <option value="2">Maret</option>
+                <option value="3">April</option>
+                <option value="4">Mei</option>
+                <option value="5">Juni</option>
+                <option value="6">Juli</option>
+                <option value="7">Agustus</option>
+                <option value="8">September</option>
+                <option value="9">Oktober</option>
+                <option value="10">November</option>
+                <option value="11">Desember</option>
+              </select>
+            </div>
+            <div id="quarter-preview-wrap" class="hidden">
+              <div
+                style="font-size: 12px; color: var(--text2); margin-bottom: 5px"
+              >
+                Periode yang akan dipakai:
+              </div>
+              <div class="quarter-preview" id="quarter-chips"></div>
+              <div class="quarter-note" id="quarter-note"></div>
+            </div>
+          </div>
+
+          <!-- Manual mode -->
+          <div id="period-manual-wrap" class="hidden">
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 8px"
+            >
+              Pilih bulan yang ingin dimasukkan (urutan otomatis Okt → Sep):
+            </div>
+            <div class="month-manual-wrap" id="month-chips-wrap"></div>
+          </div>
+        </div>
+
+        <!-- Column config -->
         <div class="card">
           <div class="card-title">
-            <i class="ti ti-columns" aria-hidden="true"></i>Atur Urutan & Kolom
+            <i class="ti ti-columns" aria-hidden="true"></i>Atur Urutan &amp;
+            Kolom
+            <span
+              id="mode-pill-cols"
+              class="mode-pill fixed"
+              style="margin-left: auto; font-size: 11px"
+            ></span>
           </div>
-          <div class="card-sub">
+          <div class="card-sub" id="col-section-desc">
             Seret untuk mengubah urutan. Toggle untuk menyembunyikan kolom dari
             hasil export.
           </div>
@@ -142,14 +327,13 @@
         </div>
       </div>
 
-      <!-- SECTION 3: Processing -->
+      <!-- ══════════════ SECTION 3: Processing ══════════════ -->
       <div id="sec-process" class="section hidden">
         <div class="card">
           <div class="card-title">
             <i class="ti ti-loader" aria-hidden="true"></i>Memproses Data
           </div>
           <div class="card-sub" id="process-sub">Membaca file ZIP...</div>
-
           <div class="progress-wrap">
             <div class="progress-label">
               <span id="prog-label">Mempersiapkan...</span>
@@ -159,9 +343,7 @@
               <div class="progress-fill" id="prog-fill" style="width: 0%"></div>
             </div>
           </div>
-
           <div class="log-box" id="log-box"></div>
-
           <div class="btn-row">
             <button class="btn btn-danger" id="btn-cancel">
               <i class="ti ti-x"></i> Batalkan Proses
@@ -170,11 +352,16 @@
         </div>
       </div>
 
-      <!-- SECTION 4: Export -->
+      <!-- ══════════════ SECTION 4: Export ══════════════ -->
       <div id="sec-export" class="section hidden">
         <div class="card">
           <div class="card-title" style="color: var(--green)">
             <i class="ti ti-circle-check" aria-hidden="true"></i>Selesai!
+            <span
+              id="mode-pill-export"
+              class="mode-pill fixed"
+              style="margin-left: auto; font-size: 11px"
+            ></span>
           </div>
           <div class="card-sub">
             Data berhasil digabungkan. Siap untuk di-export.
@@ -199,6 +386,11 @@
             </div>
           </div>
 
+          <div
+            id="period-summary"
+            style="margin-top: 0.875rem; font-size: 13px; color: var(--text2)"
+          ></div>
+
           <div id="err-summary" class="hidden" style="margin-top: 1rem">
             <div class="alert alert-warning">
               <i class="ti ti-alert-triangle"></i>
@@ -214,6 +406,52 @@
             </div>
           </div>
 
+          <!-- Export format selector (only shown when template active) -->
+          <div
+            id="export-format-section"
+            class="hidden"
+            style="margin-top: 1rem"
+          >
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--text);
+                margin-bottom: 0.625rem;
+              "
+            >
+              Pilih Format Export:
+            </div>
+            <div class="export-mode-group">
+              <button
+                class="export-mode-btn selected"
+                id="emb-template"
+                onclick="selectExportMode('template')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-table" style="font-size: 14px"></i> Format RO
+                  (per Distributor)
+                </div>
+                <div class="emb-desc">
+                  1 sheet per distributor, kolom bulan triwulan
+                </div>
+              </button>
+              <button
+                class="export-mode-btn"
+                id="emb-flat"
+                onclick="selectExportMode('flat')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-list" style="font-size: 14px"></i> Format
+                  Default (Flat)
+                </div>
+                <div class="emb-desc">
+                  Kolom standar: Distributor, Customer, Bulan, Barang, QTY...
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div class="btn-row">
             <button class="btn btn-primary" id="btn-export">
               <i class="ti ti-download"></i> Download Excel (.xlsx)
@@ -225,8 +463,41 @@
         </div>
       </div>
     </div>
+    <!-- /app -->
 
     <script>
+      // ════════════════════════════════════════════════════════════
+      //  CONSTANTS
+      // ════════════════════════════════════════════════════════════
+      const MONTH_NAMES = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+      const MONTH_SHORT = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MEI",
+        "JUN",
+        "JUL",
+        "AGS",
+        "SEP",
+        "OKT",
+        "NOV",
+        "DES",
+      ];
+
       const COLS_DEFAULT = [
         { id: "dist", label: "Nama Distributor", enabled: true },
         { id: "cust", label: "Nama Customer", enabled: true },
@@ -237,18 +508,42 @@
         { id: "jumlah", label: "Jumlah", enabled: true },
       ];
 
+      // ════════════════════════════════════════════════════════════
+      //  STATE
+      // ════════════════════════════════════════════════════════════
       let cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
       let zipFile = null;
       let resultData = [];
       let cancelled = false;
       let errors = [];
 
+      // DB selection
+      let zipFileList = []; // [{name, shortName}]
+      let selectedDBs = new Set(); // shortNames selected
+
+      // Template state
+      let tplFile = null;
+      let tplDistOrder = [];
+      let tplMonths = [];
+      let tplDataSheetName = null;
+      let tplActive = false;
+      let exportMode = "template";
+
+      // Period state
+      let periodMode = "auto"; // 'auto' | 'manual'
+      let targetMonthIdx = -1; // 0-11 for auto mode
+      let activePeriodMonths = []; // final array of month names to use (e.g. ['Desember','Januari','Februari'])
+      let manualSelectedMonths = new Set();
+
       const $ = (id) => document.getElementById(id);
 
+      // ════════════════════════════════════════════════════════════
+      //  UI HELPERS
+      // ════════════════════════════════════════════════════════════
       function showSection(name) {
-        ["upload", "columns", "process", "export"].forEach((s) => {
-          $("sec-" + s).classList.toggle("hidden", s !== name);
-        });
+        ["upload", "columns", "process", "export"].forEach((s) =>
+          $("sec-" + s).classList.toggle("hidden", s !== name),
+        );
       }
 
       function setStep(n) {
@@ -257,9 +552,11 @@
           el.classList.remove("active", "done");
           if (i < n) el.classList.add("done");
           if (i === n) el.classList.add("active");
-          if (el.querySelector(".step-num") && i < n)
-            el.querySelector(".step-num").innerHTML =
+          const num = el.querySelector(".step-num");
+          if (num && i < n)
+            num.innerHTML =
               '<i class="ti ti-check" style="font-size:12px"></i>';
+          else if (num) num.textContent = i;
         }
       }
 
@@ -283,7 +580,140 @@
         if (label) $("prog-label").textContent = label;
       }
 
-      // ─── Drop zone ────────────────────────────────────────────────────
+      function updateModePills() {
+        const label = tplActive ? "✦ Mode Template RO" : "⊞ Mode Default";
+        const cls = tplActive ? "template" : "fixed";
+        ["mode-pill-cols", "mode-pill-export"].forEach((id) => {
+          const el = $(id);
+          if (el) {
+            el.textContent = label;
+            el.className = "mode-pill " + cls;
+          }
+        });
+      }
+
+      function selectExportMode(mode) {
+        exportMode = mode;
+        $("emb-template").classList.toggle("selected", mode === "template");
+        $("emb-flat").classList.toggle("selected", mode === "flat");
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  PERIOD / MONTH LOGIC
+      // ════════════════════════════════════════════════════════════
+      function setPeriodMode(mode) {
+        periodMode = mode;
+        $("pmb-auto").classList.toggle("selected", mode === "auto");
+        $("pmb-manual").classList.toggle("selected", mode === "manual");
+        $("period-auto-wrap").classList.toggle("hidden", mode !== "auto");
+        $("period-manual-wrap").classList.toggle("hidden", mode !== "manual");
+      }
+
+      function getQuarterMonths(targetIdx) {
+        // returns array of month indices [target-2, target-1, target] (cyclically)
+        return [
+          (targetIdx - 2 + 12) % 12,
+          (targetIdx - 1 + 12) % 12,
+          targetIdx,
+        ];
+      }
+
+      // Normalize month string to index (0-11), returns -1 if unrecognized
+      function parseMonthIdx(s) {
+        if (!s) return -1;
+        const t = s.toUpperCase().trim();
+        const fullIdx = MONTH_NAMES.findIndex((m) => m.toUpperCase() === t);
+        if (fullIdx >= 0) return fullIdx;
+        const shortIdx = MONTH_SHORT.findIndex((m) => m === t.slice(0, 3));
+        if (shortIdx >= 0) return shortIdx;
+        // Try partial
+        const partial = MONTH_NAMES.findIndex((m) =>
+          m.toUpperCase().startsWith(t.slice(0, 3)),
+        );
+        return partial;
+      }
+
+      function onTargetMonthChange() {
+        const val = $("sel-target-month").value;
+        if (val === "") {
+          $("quarter-preview-wrap").classList.add("hidden");
+          targetMonthIdx = -1;
+          return;
+        }
+        targetMonthIdx = parseInt(val);
+        const idxs = getQuarterMonths(targetMonthIdx);
+
+        // Detect which months actually exist in data
+        const availableMonths = new Set();
+        resultData.forEach((r) => {
+          const idx = parseMonthIdx(r.bulan);
+          if (idx >= 0) availableMonths.add(idx);
+        });
+        // If no data yet (called before process), just show preview
+        const hasData = resultData.length > 0;
+
+        const chipsEl = $("quarter-chips");
+        chipsEl.innerHTML = "";
+        const presentIdxs = [];
+        idxs.forEach((idx) => {
+          const present = !hasData || availableMonths.has(idx);
+          const chip = document.createElement("div");
+          chip.className = "quarter-chip" + (present ? "" : " missing");
+          chip.textContent =
+            MONTH_NAMES[idx] + (present ? "" : " (tidak ada data)");
+          chipsEl.appendChild(chip);
+          if (present || !hasData) presentIdxs.push(idx);
+        });
+
+        const note = $("quarter-note");
+        if (hasData && presentIdxs.length < 3) {
+          note.textContent = `Catatan: hanya ${presentIdxs.length} bulan yang ada di data — akan dipakai data yang tersedia saja.`;
+        } else {
+          note.textContent = `Periode: ${idxs.map((i) => MONTH_NAMES[i]).join(" → ")}`;
+        }
+
+        $("quarter-preview-wrap").classList.remove("hidden");
+
+        // Set activePeriodMonths
+        activePeriodMonths = idxs.map((i) => MONTH_NAMES[i]);
+      }
+
+      function renderMonthChips() {
+        const wrap = $("month-chips-wrap");
+        wrap.innerHTML = "";
+        MONTH_NAMES.forEach((name, idx) => {
+          const chip = document.createElement("div");
+          chip.className =
+            "month-chip" + (manualSelectedMonths.has(idx) ? " active" : "");
+          chip.dataset.idx = idx;
+          chip.textContent = name;
+          chip.addEventListener("click", () => {
+            if (manualSelectedMonths.has(idx)) manualSelectedMonths.delete(idx);
+            else manualSelectedMonths.add(idx);
+            chip.classList.toggle("active", manualSelectedMonths.has(idx));
+            // update activePeriodMonths
+            activePeriodMonths = Array.from(manualSelectedMonths)
+              .sort((a, b) => a - b)
+              .map((i) => MONTH_NAMES[i]);
+          });
+          wrap.appendChild(chip);
+        });
+      }
+
+      function getActivePeriodMonths() {
+        if (periodMode === "auto") {
+          if (targetMonthIdx < 0) return [];
+          return getQuarterMonths(targetMonthIdx).map((i) => MONTH_NAMES[i]);
+        } else {
+          return Array.from(manualSelectedMonths)
+            .sort((a, b) => a - b)
+            .map((i) => MONTH_NAMES[i]);
+        }
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  ZIP DROP ZONE
+      // ════════════════════════════════════════════════════════════
       const dropZone = $("drop-zone");
       dropZone.addEventListener("click", () => $("file-input").click());
       dropZone.addEventListener("dragover", (e) => {
@@ -296,14 +726,13 @@
       dropZone.addEventListener("drop", (e) => {
         e.preventDefault();
         dropZone.classList.remove("drag-over");
-        const f = e.dataTransfer.files[0];
-        if (f) handleFile(f);
+        if (e.dataTransfer.files[0]) handleZipFile(e.dataTransfer.files[0]);
       });
       $("file-input").addEventListener("change", (e) => {
-        if (e.target.files[0]) handleFile(e.target.files[0]);
+        if (e.target.files[0]) handleZipFile(e.target.files[0]);
       });
 
-      async function handleFile(f) {
+      async function handleZipFile(f) {
         if (!f.name.toLowerCase().endsWith(".zip")) {
           alert("Hanya file .zip yang diterima.");
           return;
@@ -313,7 +742,6 @@
         $("file-size").textContent = formatSize(f.size);
         $("file-selected").classList.remove("hidden");
         dropZone.classList.add("hidden");
-
         try {
           const zip = await JSZip.loadAsync(f);
           const xlsxFiles = Object.keys(zip.files).filter(
@@ -322,7 +750,21 @@
           );
           $("zip-preview").textContent =
             `Ditemukan ${xlsxFiles.length} file .xlsx di dalam ZIP`;
-          $("btn-next-1").disabled = xlsxFiles.length === 0;
+
+          zipFileList = xlsxFiles.map((name) => ({
+            name,
+            shortName: name.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, ""),
+          }));
+          selectedDBs = new Set(zipFileList.map((f) => f.shortName));
+
+          if (xlsxFiles.length > 0) {
+            $("db-sel-card").classList.remove("hidden");
+            renderDBList();
+            $("btn-next-1").disabled = false;
+          } else {
+            $("db-sel-card").classList.add("hidden");
+            $("btn-next-1").disabled = true;
+          }
         } catch (e) {
           $("zip-preview").textContent =
             "Tidak dapat membaca ZIP: " + e.message;
@@ -331,35 +773,276 @@
 
       $("btn-remove-file").addEventListener("click", () => {
         zipFile = null;
+        zipFileList = [];
+        selectedDBs.clear();
         $("file-selected").classList.add("hidden");
+        $("db-sel-card").classList.add("hidden");
         dropZone.classList.remove("hidden");
         $("file-input").value = "";
+      });
+
+      // ════════════════════════════════════════════════════════════
+      //  DB LIST RENDER & SELECTION
+      // ════════════════════════════════════════════════════════════
+      function renderDBList() {
+        const list = $("db-list");
+        list.innerHTML = "";
+        zipFileList.forEach(({ shortName }) => {
+          const item = document.createElement("div");
+          item.className =
+            "db-item" + (selectedDBs.has(shortName) ? " selected" : "");
+          item.innerHTML = `
+          <input type="checkbox" ${selectedDBs.has(shortName) ? "checked" : ""} data-name="${shortName}">
+          <span class="db-item-name">${shortName}</span>
+          <span class="db-item-badge">.xlsx</span>`;
+          const cb = item.querySelector("input");
+          const toggle = () => {
+            if (cb.checked) {
+              selectedDBs.add(shortName);
+              item.classList.add("selected");
+            } else {
+              selectedDBs.delete(shortName);
+              item.classList.remove("selected");
+            }
+            updateSelCount();
+            $("btn-next-1").disabled = selectedDBs.size === 0;
+          };
+          cb.addEventListener("change", toggle);
+          item.addEventListener("click", (e) => {
+            if (e.target !== cb) {
+              cb.checked = !cb.checked;
+              toggle();
+            }
+          });
+          list.appendChild(item);
+        });
+        updateSelCount();
+      }
+
+      function updateSelCount() {
+        $("sel-count-label").textContent =
+          `${selectedDBs.size} / ${zipFileList.length} dipilih`;
+      }
+
+      $("btn-sel-all").addEventListener("click", () => {
+        zipFileList.forEach((f) => selectedDBs.add(f.shortName));
+        renderDBList();
+        $("btn-next-1").disabled = false;
+      });
+      $("btn-sel-none").addEventListener("click", () => {
+        selectedDBs.clear();
+        renderDBList();
         $("btn-next-1").disabled = true;
       });
 
+      // ════════════════════════════════════════════════════════════
+      //  TEMPLATE DROP ZONE
+      // ════════════════════════════════════════════════════════════
+      const tplZone = $("tpl-drop-zone");
+      tplZone.addEventListener("click", () => $("tpl-file-input").click());
+      tplZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        tplZone.classList.add("drag-over");
+      });
+      tplZone.addEventListener("dragleave", () =>
+        tplZone.classList.remove("drag-over"),
+      );
+      tplZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        tplZone.classList.remove("drag-over");
+        const f = e.dataTransfer.files[0];
+        if (f && f.name.match(/\.xlsx?$/i)) handleTplFile(f);
+        else alert("Hanya file .xlsx yang diterima untuk template.");
+      });
+      $("tpl-file-input").addEventListener("change", (e) => {
+        if (e.target.files[0]) handleTplFile(e.target.files[0]);
+      });
+
+      async function handleTplFile(f) {
+        try {
+          const ab = await f.arrayBuffer();
+          const wb = XLSX.read(ab, { type: "array", raw: true });
+
+          // ── Parse Sheet1: urutan distributor ──
+          const distList = [];
+          if (wb.SheetNames.includes("Sheet1")) {
+            const ws = wb.Sheets["Sheet1"];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            let distColIdx = -1,
+              dataRowStart = 0;
+            for (let r = 0; r < Math.min(data.length, 10); r++) {
+              const row = data[r] || [];
+              const idx = row.findIndex(
+                (v) =>
+                  v && String(v).toUpperCase().includes("NAMA DISTRIBUTOR"),
+              );
+              if (idx >= 0) {
+                distColIdx = idx;
+                dataRowStart = r + 1;
+                break;
+              }
+            }
+            if (distColIdx < 0) {
+              distColIdx = 6;
+              dataRowStart = 5;
+            }
+            for (let r = dataRowStart; r < data.length; r++) {
+              const row = data[r] || [];
+              const v = row[distColIdx];
+              if (v && typeof v === "string" && v.trim()) {
+                const name = v.trim();
+                if (
+                  !name.toUpperCase().startsWith("TOTAL") &&
+                  !name.toUpperCase().startsWith("*")
+                ) {
+                  distList.push(name);
+                }
+              }
+            }
+          }
+
+          // ── Parse data sheet: cari format kolom bulan ──
+          let months = [];
+          let dataSheetName = null;
+          for (const sn of wb.SheetNames) {
+            if (sn === "Sheet1") continue;
+            const ws = wb.Sheets[sn];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            for (let r = 0; r < Math.min(data.length, 6); r++) {
+              const row = data[r] || [];
+              const rowNext = data[r + 1] || [];
+              const hasCust = row.some(
+                (v) => v && String(v).toUpperCase().includes("CUSTOMER"),
+              );
+              const hasBulan = row.some(
+                (v) => v && String(v).toUpperCase() === "BULAN",
+              );
+              if (hasCust && hasBulan) {
+                const bulanColStart = row.findIndex(
+                  (v) => v && String(v).toUpperCase() === "BULAN",
+                );
+                months = rowNext
+                  .slice(bulanColStart)
+                  .filter((v) => v && String(v).trim());
+                dataSheetName = sn;
+                break;
+              }
+            }
+            if (dataSheetName) break;
+          }
+
+          if (distList.length === 0) {
+            alert(
+              'Tidak dapat menemukan daftar distributor di Sheet1. Pastikan ada kolom "NAMA DISTRIBUTOR".',
+            );
+            return;
+          }
+
+          tplFile = f;
+          tplDistOrder = distList;
+          tplMonths = months;
+          tplDataSheetName = dataSheetName;
+          tplActive = true;
+
+          tplZone.classList.add("hidden");
+          $("tpl-selected").classList.remove("hidden");
+          $("tpl-file-name").textContent = f.name;
+          $("tpl-file-meta").textContent =
+            `${distList.length} distributor ditemukan${months.length ? " · Bulan: " + months.join(", ") : ""}`;
+
+          $("tpl-preview-panel").classList.remove("hidden");
+          const distListEl = $("tpl-dist-list");
+          distListEl.innerHTML = "";
+          distList.forEach((name, i) => {
+            const chip = document.createElement("div");
+            chip.className = "tpl-dist-chip";
+            chip.textContent = `${i + 1}. ${name}`;
+            distListEl.appendChild(chip);
+          });
+          $("tpl-months-info").textContent = months.length
+            ? `Kolom bulan dari template: ${months.join(" · ")}`
+            : "Kolom bulan tidak terdeteksi — akan menggunakan pilihan periode";
+        } catch (e) {
+          alert("Gagal membaca file template: " + e.message);
+        }
+      }
+
+      $("btn-remove-tpl").addEventListener("click", () => {
+        tplFile = tplDistOrder = null;
+        tplMonths = [];
+        tplDataSheetName = null;
+        tplActive = false;
+        tplZone.classList.remove("hidden");
+        $("tpl-selected").classList.add("hidden");
+        $("tpl-file-input").value = "";
+      });
+
+      // ════════════════════════════════════════════════════════════
+      //  NAV
+      // ════════════════════════════════════════════════════════════
       $("btn-next-1").addEventListener("click", () => {
         setStep(2);
         showSection("columns");
+        updateModePills();
         renderCols();
+        renderMonthChips();
       });
 
-      // ─── Column config ─────────────────────────────────────────────────
+      $("btn-back-1").addEventListener("click", () => {
+        setStep(1);
+        showSection("upload");
+      });
+
+      $("btn-next-2").addEventListener("click", () => {
+        if (cols.filter((c) => c.enabled).length === 0) {
+          alert("Minimal 1 kolom harus aktif.");
+          return;
+        }
+        const months = getActivePeriodMonths();
+        if (months.length === 0) {
+          alert("Pilih minimal 1 bulan untuk periode RO.");
+          return;
+        }
+        activePeriodMonths = months;
+        setStep(3);
+        showSection("process");
+        startProcessing();
+      });
+
+      // ════════════════════════════════════════════════════════════
+      //  COLUMN CONFIG
+      // ════════════════════════════════════════════════════════════
       function renderCols() {
         const list = $("col-list");
         list.innerHTML = "";
+        if (tplActive) {
+          $("col-section-desc").innerHTML =
+            "Mode <strong>Template RO</strong> aktif — output per distributor mengikuti format acuan. Kolom di bawah hanya untuk export format flat.";
+        } else {
+          $("col-section-desc").textContent =
+            "Seret untuk mengubah urutan. Toggle untuk menyembunyikan kolom dari hasil export.";
+        }
         cols.forEach((col, idx) => {
           const item = document.createElement("div");
           item.className = "col-item";
           item.draggable = true;
           item.dataset.idx = idx;
           item.innerHTML = `
-      <i class="ti ti-grip-vertical col-handle" aria-hidden="true"></i>
-      <div class="col-badge">${idx + 1}</div>
-      <span class="col-name">${col.label}</span>
-      <label class="col-toggle" title="${col.enabled ? "Sembunyikan" : "Tampilkan"}">
-        <input type="checkbox" ${col.enabled ? "checked" : ""} data-idx="${idx}">
-        <span class="toggle-track"></span>
-      </label>`;
+          <i class="ti ti-grip-vertical col-handle" aria-hidden="true"></i>
+          <div class="col-badge">${idx + 1}</div>
+          <span class="col-name">${col.label}</span>
+          <label class="col-toggle" title="${col.enabled ? "Sembunyikan" : "Tampilkan"}">
+            <input type="checkbox" ${col.enabled ? "checked" : ""} data-idx="${idx}">
+            <span class="toggle-track"></span>
+          </label>`;
           item.querySelector("input").addEventListener("change", (e) => {
             cols[e.target.dataset.idx].enabled = e.target.checked;
           });
@@ -392,9 +1075,7 @@
           if (!dragSrc || dragSrc === item) return;
           const a = parseInt(dragSrc.dataset.idx),
             b = parseInt(item.dataset.idx);
-          const tmp = cols[a];
-          cols[a] = cols[b];
-          cols[b] = tmp;
+          [cols[a], cols[b]] = [cols[b], cols[a]];
           renderCols();
         });
       }
@@ -403,41 +1084,17 @@
         cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
         renderCols();
       });
-      $("btn-back-1").addEventListener("click", () => {
-        setStep(1);
-        showSection("upload");
-      });
-      $("btn-next-2").addEventListener("click", () => {
-        if (cols.filter((c) => c.enabled).length === 0) {
-          alert("Minimal 1 kolom harus aktif.");
-          return;
-        }
-        setStep(3);
-        showSection("process");
-        startProcessing();
-      });
 
-      // ─── Processing ────────────────────────────────────────────────────
+      // ════════════════════════════════════════════════════════════
+      //  DATA EXTRACTION
+      // ════════════════════════════════════════════════════════════
       function getMonthName(v) {
-        const months = [
-          "Januari",
-          "Februari",
-          "Maret",
-          "April",
-          "Mei",
-          "Juni",
-          "Juli",
-          "Agustus",
-          "September",
-          "Oktober",
-          "November",
-          "Desember",
-        ];
-        if (v instanceof Date) return months[v.getMonth()] || "";
-        if (typeof v === "number" && v >= 1 && v <= 12) return months[v - 1];
+        if (v instanceof Date) return MONTH_NAMES[v.getMonth()] || "";
+        if (typeof v === "number" && v >= 1 && v <= 12)
+          return MONTH_NAMES[v - 1];
         if (typeof v === "string") {
           const t = v.trim();
-          if (/^\d+$/.test(t)) return months[parseInt(t) - 1] || t;
+          if (/^\d+$/.test(t)) return MONTH_NAMES[parseInt(t) - 1] || t;
           return t;
         }
         return v || "";
@@ -445,19 +1102,16 @@
 
       function xlsxDateToJS(serial) {
         if (serial instanceof Date) return serial;
-        if (typeof serial === "number") {
-          const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
-          return d;
-        }
+        if (typeof serial === "number")
+          return new Date(Math.round((serial - 25569) * 86400 * 1000));
         return null;
       }
 
       function detectAndExtract(wb, fileName) {
         const distName = fileName
           .replace(/\.xlsx$/i, "")
-          .replace(/^.*[\\/]/, "");
+          .replace(/^.*[\\\/]/, "");
         let rows = [];
-
         const trySheet = (sheetName, extractor) => {
           if (!wb.SheetNames.includes(sheetName)) return false;
           try {
@@ -474,11 +1128,10 @@
             return false;
           }
         };
-
         const col = (row, idx) => (idx < row.length ? row[idx] : null);
         const str = (v) => (v == null ? "" : String(v).trim());
 
-        // Try "Rincian Penjualan per Barang" (Aldi, SAJ format variant)
+        // Try "Rincian Penjualan per Barang"
         if (wb.SheetNames.includes("Rincian Penjualan per Barang")) {
           const ws = wb.Sheets["Rincian Penjualan per Barang"];
           const data = XLSX.utils.sheet_to_json(ws, {
@@ -488,8 +1141,6 @@
           });
           if (data.length > 1) {
             const hdr = data[0] || [];
-            // SAJ: Cabang(0),Salesman(1),ID(2),Tanggal(3),Bulan(4),Nama Pelanggan(5),Nama Barang(6),Kuantitas(7),Satuan(8),@Harga(9),Penjualan(10)
-            // Aldi: Nomor(0),Tanggal(1),Bulan(2),No(3),Nama Pelanggan(4),Alamat(5),Penjual(6),Kode(7),Nama Barang(8),Kuantitas(9),Satuan(10),@Harga(11),Jml Keluar(12),Diskon(13),Total Harga(14)
             const isSAJ = str(hdr[0]).toLowerCase().includes("cabang");
             rows = data
               .slice(1)
@@ -521,33 +1172,6 @@
           }
         }
 
-        // UD Sejahtera Bwi: Rincian different columns
-        if (
-          wb.SheetNames.includes("Rincian Penjualan per Barang") &&
-          rows.length === 0
-        ) {
-          const ws = wb.Sheets["Rincian Penjualan per Barang"];
-          const data = XLSX.utils.sheet_to_json(ws, {
-            header: 1,
-            defval: null,
-            raw: true,
-          });
-          rows = data
-            .slice(1)
-            .filter((r) => r.some((v) => v != null))
-            .map((r) => ({
-              dist: distName,
-              cust: str(col(r, 10)),
-              bulan: str(col(r, 9)),
-              barang: str(col(r, 3)),
-              qty: col(r, 4),
-              satuan: str(col(r, 5)),
-              jumlah: col(r, 7),
-            }))
-            .filter((r) => r.cust && r.barang);
-          if (rows.length > 0) return rows;
-        }
-
         // Berkah Jaya: Penjualan_By_Salesman
         for (const sn of wb.SheetNames) {
           if (sn.startsWith("Penjualan_By_Salesman")) {
@@ -574,7 +1198,6 @@
           }
         }
 
-        // PT Panda Ibe: data sheet
         if (
           trySheet("data", (data, dn) =>
             data
@@ -594,7 +1217,6 @@
         )
           return rows;
 
-        // MJAP Tasikmalaya: Laporan_Penjualan_Format2
         if (
           trySheet("Laporan_Penjualan_Format2", (data, dn) =>
             data
@@ -614,7 +1236,6 @@
         )
           return rows;
 
-        // list-faktur-penjualan (Aquilla)
         if (
           trySheet("list-faktur-penjualan", (data, dn) =>
             data
@@ -634,7 +1255,6 @@
         )
           return rows;
 
-        // Page1 (Anugrah)
         if (
           trySheet("Page1", (data, dn) =>
             data
@@ -654,7 +1274,6 @@
         )
           return rows;
 
-        // Penjualan_By_Salesman variant
         if (
           trySheet("Penjualan_By_Salesman_01Jan2026", (data, dn) =>
             data
@@ -674,7 +1293,6 @@
         )
           return rows;
 
-        // DATA sheet (Ananta Tegal, Sinar Sukses, CC Jaya, Pilar, Slamet)
         if (wb.SheetNames.includes("DATA")) {
           const ws = wb.Sheets["DATA"];
           const data = XLSX.utils.sheet_to_json(ws, {
@@ -683,8 +1301,6 @@
             raw: true,
           });
           const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
-
-          // CC Jaya Sukabumi: has NAMACUSTOMER col
           if (hdr.some((h) => h.includes("NAMACUSTOMER"))) {
             rows = data
               .slice(1)
@@ -701,7 +1317,6 @@
               .filter((r) => r.cust && r.barang);
             if (rows.length > 0) return rows;
           }
-          // Pilar Utama: has DISTID col
           if (hdr[0] === "DISTID" || hdr.some((h) => h === "DISTID")) {
             rows = data
               .slice(1)
@@ -718,7 +1333,6 @@
               .filter((r) => r.cust && r.barang);
             if (rows.length > 0) return rows;
           }
-          // Slamet: has 'Bulan Faktur'
           if (hdr.some((h) => h.includes("BULAN FAKTUR"))) {
             rows = data
               .slice(1)
@@ -735,7 +1349,6 @@
               .filter((r) => r.cust && r.barang);
             if (rows.length > 0) return rows;
           }
-          // Sinar Sukses: TGL,BLN,Kode,NAMA TOKO
           if (
             hdr[3] === "NAMA TOKO" ||
             hdr.some((h) => h.includes("NAMA TOKO"))
@@ -755,7 +1368,6 @@
               .filter((r) => r.cust && r.barang);
             if (rows.length > 0) return rows;
           }
-          // Ananta Tegal/Pekalongan: Tanggal,Bulan,Nomor Nota...Nama Pelanggan
           const qtyIdx = hdr.findIndex((h) => h === "QTY");
           const custIdx = hdr.findIndex((h) => h.includes("NAMA PELANGGAN"));
           const brgIdx = hdr.findIndex(
@@ -779,7 +1391,6 @@
               .filter((r) => r.cust && r.barang);
             if (rows.length > 0) return rows;
           }
-          // generic DATA fallback
           if (data.length > 1) {
             rows = data
               .slice(1)
@@ -798,7 +1409,7 @@
           }
         }
 
-        // Laporan_Penjualan_Format2 (generic)
+        // Generic laporan/penjualan sheet
         for (const sn of wb.SheetNames) {
           if (
             sn.toLowerCase().includes("laporan") ||
@@ -858,7 +1469,7 @@
           }
         }
 
-        // RAW sheet (Bravo Eterna)
+        // RAW sheet
         for (const sn of wb.SheetNames) {
           if (sn.toUpperCase().startsWith("RAW")) {
             const ws = wb.Sheets[sn];
@@ -867,7 +1478,6 @@
               defval: null,
               raw: true,
             });
-            // find header row
             let hdrIdx = data.findIndex((r) =>
               r.some(
                 (v) =>
@@ -903,7 +1513,7 @@
           }
         }
 
-        // Sheet1 generic fallback
+        // Sheet1/Sheet2 generic
         for (const sn of ["Sheet1", "Sheet2", "Cipta Anugerah Rezeki"]) {
           if (wb.SheetNames.includes(sn)) {
             const ws = wb.Sheets[sn];
@@ -959,6 +1569,9 @@
         return [];
       }
 
+      // ════════════════════════════════════════════════════════════
+      //  PROCESSING
+      // ════════════════════════════════════════════════════════════
       async function startProcessing() {
         cancelled = false;
         resultData = [];
@@ -975,22 +1588,36 @@
           return;
         }
 
-        const xlsxFiles = Object.keys(zip.files).filter(
+        // Filter only selected DBs
+        const allXlsxFiles = Object.keys(zip.files).filter(
           (n) => n.match(/\.xlsx$/i) && !zip.files[n].dir && !n.includes("~$"),
         );
-        log(`Ditemukan ${xlsxFiles.length} file .xlsx`, "info");
+        const xlsxFiles = allXlsxFiles.filter((name) => {
+          const shortName = name
+            .replace(/^.*[\\\/]/, "")
+            .replace(/\.xlsx$/i, "");
+          return selectedDBs.has(shortName);
+        });
+
+        log(
+          `Ditemukan ${allXlsxFiles.length} file .xlsx, dipilih ${xlsxFiles.length} DB`,
+          "info",
+        );
+        log(`Periode RO: ${activePeriodMonths.join(" → ")}`, "info");
+        if (tplActive)
+          log(`Mode: Template RO — ${tplDistOrder.length} distributor`, "info");
+        else log("Mode: Default (format flat)", "info");
 
         for (let i = 0; i < xlsxFiles.length; i++) {
           if (cancelled) {
-            log("Proses dibatalkan oleh pengguna.", "err");
+            log("Proses dibatalkan.", "err");
             return;
           }
           const name = xlsxFiles[i];
-          const shortName = name.replace(/^.*[\\/]/, "");
+          const shortName = name.replace(/^.*[\\\/]/, "");
           setProgress((i / xlsxFiles.length) * 90, `Memproses: ${shortName}`);
           $("process-sub").textContent =
             `Memproses file ${i + 1} dari ${xlsxFiles.length}...`;
-
           try {
             const ab = await zip.files[name].async("arraybuffer");
             const wb = XLSX.read(ab, {
@@ -1027,6 +1654,7 @@
       function showResults(total) {
         setStep(4);
         showSection("export");
+        updateModePills();
         const distSet = new Set(resultData.map((r) => r.dist));
         $("stat-rows").textContent = resultData.length.toLocaleString();
         $("stat-dist").textContent = distSet.size;
@@ -1035,12 +1663,23 @@
         $("stat-err").style.color =
           errors.length > 0 ? "var(--red)" : "var(--text)";
 
+        // Period summary
+        const ps = $("period-summary");
+        ps.textContent = `Periode: ${activePeriodMonths.join(" → ")} (${activePeriodMonths.length} bulan)`;
+
+        // Refresh quarter preview with actual data
+        if (periodMode === "auto" && targetMonthIdx >= 0) onTargetMonthChange();
+
         if (errors.length > 0) {
           $("err-summary").classList.remove("hidden");
           $("err-list").innerHTML = errors
             .map((e) => `<div>• ${e.name} — ${e.reason}</div>`)
             .join("");
         }
+
+        // Show format selector — always show since we now always have RO mode
+        $("export-format-section").classList.remove("hidden");
+        selectExportMode(tplActive ? "template" : "template"); // default to RO per-distributor
       }
 
       $("btn-cancel").addEventListener("click", () => {
@@ -1055,25 +1694,312 @@
         }, 600);
       });
 
-      // ─── Export ────────────────────────────────────────────────────────
-      $("btn-export").addEventListener("click", () => {
+      // ════════════════════════════════════════════════════════════
+      //  EXPORT — RO TEMPLATE MODE
+      //  Layout: 1 sheet per distributor
+      //  Format: NAMA DISTRIBUTOR | NO | NAMA CUSTOMER | BULAN (multi-col per bulan)
+      //  Nilai: QTY total per customer per bulan dalam periode triwulan
+      // ════════════════════════════════════════════════════════════
+      function buildROWorkbook() {
+        const wb = XLSX.utils.book_new();
+
+        // Determine months to use
+        // Priority: tplMonths (from template) → activePeriodMonths → detect from data
+        let months;
+        if (tplActive && tplMonths.length > 0) {
+          months = tplMonths;
+        } else if (activePeriodMonths.length > 0) {
+          months = activePeriodMonths;
+        } else {
+          const monthSet = new Set();
+          resultData.forEach((r) => {
+            if (r.bulan) monthSet.add(r.bulan);
+          });
+          months = Array.from(monthSet);
+        }
+
+        // Filter data to only months in period
+        // Normalize period months for comparison
+        const periodNorm = new Set(months.map((m) => m.toUpperCase().trim()));
+
+        function monthInPeriod(bulan) {
+          if (!bulan) return false;
+          const b = bulan.toUpperCase().trim();
+          if (periodNorm.has(b)) return true;
+          // Partial match (e.g. "FEBRUARI" matches "FEB")
+          for (const pm of periodNorm) {
+            if (b.startsWith(pm.slice(0, 3)) || pm.startsWith(b.slice(0, 3)))
+              return true;
+          }
+          return false;
+        }
+
+        // Build index: dist → cust → monthName → qty sum
+        // Only include rows matching period months
+        const dataIdx = {};
+        resultData.forEach((row) => {
+          if (!monthInPeriod(row.bulan)) return;
+          const d = row.dist || "";
+          const c = row.cust || "";
+          const b = row.bulan || "";
+          const q =
+            typeof row.qty === "number" ? row.qty : parseFloat(row.qty) || 0;
+          if (!dataIdx[d]) dataIdx[d] = {};
+          if (!dataIdx[d][c]) dataIdx[d][c] = {};
+          dataIdx[d][c][b] = (dataIdx[d][c][b] || 0) + q;
+        });
+
+        // Fuzzy match distributor names
+        function fuzzyMatch(tplName, dataKeys) {
+          const norm = (s) =>
+            s
+              .toUpperCase()
+              .replace(/[,.\-_]/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+          const nt = norm(tplName);
+          let found = dataKeys.find((k) => norm(k) === nt);
+          if (found) return found;
+          found = dataKeys.find(
+            (k) => nt.includes(norm(k)) || norm(k).includes(nt),
+          );
+          if (found) return found;
+          const tWords = new Set(nt.split(" ").filter((w) => w.length > 3));
+          let best = null,
+            bestScore = 0;
+          dataKeys.forEach((k) => {
+            const kWords = norm(k)
+              .split(" ")
+              .filter((w) => w.length > 3);
+            const overlap = kWords.filter((w) => tWords.has(w)).length;
+            if (overlap > bestScore) {
+              bestScore = overlap;
+              best = k;
+            }
+          });
+          return bestScore > 0 ? best : null;
+        }
+
+        // Build the ordered list of distributors to produce sheets for
+        const dataDistKeys = Object.keys(dataIdx);
+        let distOrder;
+        if (tplActive && tplDistOrder.length > 0) {
+          // Use template order, then append unmatched
+          const processedKeys = new Set();
+          distOrder = [];
+          tplDistOrder.forEach((tplName) => {
+            const key = fuzzyMatch(tplName, dataDistKeys);
+            distOrder.push({ displayName: tplName, dataKey: key });
+            if (key) processedKeys.add(key);
+          });
+          // Add distributor from data that are not in template
+          dataDistKeys
+            .filter((k) => k && !processedKeys.has(k))
+            .forEach((k) => {
+              distOrder.push({ displayName: k, dataKey: k });
+            });
+        } else {
+          // Use order from selected DBs (zip file order), then any extras
+          const selOrder = Array.from(selectedDBs);
+          const processedKeys = new Set();
+          distOrder = [];
+          selOrder.forEach((shortName) => {
+            const key = fuzzyMatch(shortName, dataDistKeys);
+            distOrder.push({ displayName: shortName, dataKey: key });
+            if (key) processedKeys.add(key);
+          });
+          dataDistKeys
+            .filter((k) => k && !processedKeys.has(k))
+            .forEach((k) => {
+              distOrder.push({ displayName: k, dataKey: k });
+            });
+        }
+
+        // ── Determine which months actually have data per distributor (for missing month logic) ──
+        // For each dist, only output columns where at least 1 customer has data
+        // But keep ALL period months as columns for consistency
+
+        // ── Buat 1 sheet per distributor ──
+        distOrder.forEach(({ displayName, dataKey }) => {
+          const custData = dataKey ? dataIdx[dataKey] || {} : {};
+          const custList = Object.keys(custData).sort();
+
+          // Determine which of the period months actually have data for this distributor
+          const availMonths = new Set();
+          custList.forEach((c) => {
+            Object.keys(custData[c]).forEach((b) => {
+              // Normalize to find which period month it belongs to
+              months.forEach((pm) => {
+                const bNorm = b.toUpperCase().trim();
+                const pmNorm = pm.toUpperCase().trim();
+                if (
+                  bNorm === pmNorm ||
+                  bNorm.startsWith(pmNorm.slice(0, 3)) ||
+                  pmNorm.startsWith(bNorm.slice(0, 3))
+                ) {
+                  availMonths.add(pm);
+                }
+              });
+            });
+          });
+
+          // Use only months that have data (RO logic: if a month has no data, skip it)
+          // But keep all period months as headers for reference; just leave blank if no data
+          const wsData = [];
+
+          // Row 1: Distributor name
+          wsData.push([displayName]);
+
+          // Row 2: NO | NAMA CUSTOMER | BULAN (spanning) → using months as sub-headers directly
+          // Format matches RO_FEBRUARI.xlsx: row1=headers, row2=month names
+          wsData.push([
+            "NO",
+            "NAMA CUSTOMER",
+            "BULAN",
+            ...months.slice(1).map(() => null),
+          ]);
+          wsData.push([null, null, ...months]);
+
+          // Customer rows
+          if (custList.length > 0) {
+            custList.forEach((cust, i) => {
+              const monthVals = months.map((pm) => {
+                const pmNorm = pm.toUpperCase().trim();
+                const val = custData[cust];
+                // Find matching key from data
+                const key = Object.keys(val).find((k) => {
+                  const kNorm = k.toUpperCase().trim();
+                  return (
+                    kNorm === pmNorm ||
+                    kNorm.startsWith(pmNorm.slice(0, 3)) ||
+                    pmNorm.startsWith(kNorm.slice(0, 3))
+                  );
+                });
+                return key ? val[key] : null;
+              });
+              wsData.push([i + 1, cust, ...monthVals]);
+            });
+          } else {
+            wsData.push([1, "(tidak ada data)", ...months.map(() => null)]);
+          }
+
+          // Summary row: total per bulan
+          const totalRow = [
+            "",
+            "TOTAL",
+            ...months.map((pm, mi) => {
+              let total = 0;
+              custList.forEach((c) => {
+                const pmNorm = pm.toUpperCase().trim();
+                const val = custData[c];
+                const key = Object.keys(val).find((k) => {
+                  const kNorm = k.toUpperCase().trim();
+                  return (
+                    kNorm === pmNorm ||
+                    kNorm.startsWith(pmNorm.slice(0, 3)) ||
+                    pmNorm.startsWith(kNorm.slice(0, 3))
+                  );
+                });
+                if (key) total += val[key];
+              });
+              return total > 0 ? total : null;
+            }),
+          ];
+          wsData.push(totalRow);
+
+          // Create sheet
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          ws["!cols"] = [
+            { wch: 5 },
+            { wch: 36 },
+            ...months.map(() => ({ wch: 10 })),
+          ];
+
+          const sheetName = displayName
+            .replace(/[\\\/\?\*\[\]]/g, "")
+            .slice(0, 31);
+          XLSX.utils.book_append_sheet(
+            wb,
+            ws,
+            sheetName ||
+              `Dist${distOrder.indexOf({ displayName, dataKey }) + 1}`,
+          );
+        });
+
+        // ── Sheet ringkasan semua distributor ──
+        const summaryData = [
+          ["COLLECT DB — RINGKASAN RO"],
+          [],
+          ["NO", "NAMA DISTRIBUTOR", ...months, "TOTAL"],
+        ];
+        distOrder.forEach(({ displayName, dataKey }, i) => {
+          const custData = dataKey ? dataIdx[dataKey] || {} : {};
+          const monthTotals = months.map((pm) => {
+            const pmNorm = pm.toUpperCase().trim();
+            let total = 0;
+            Object.values(custData).forEach((monthMap) => {
+              const key = Object.keys(monthMap).find((k) => {
+                const kNorm = k.toUpperCase().trim();
+                return (
+                  kNorm === pmNorm ||
+                  kNorm.startsWith(pmNorm.slice(0, 3)) ||
+                  pmNorm.startsWith(kNorm.slice(0, 3))
+                );
+              });
+              if (key) total += monthMap[key];
+            });
+            return total || null;
+          });
+          const rowTotal = monthTotals.reduce((s, v) => s + (v || 0), 0);
+          summaryData.push([
+            i + 1,
+            displayName,
+            ...monthTotals,
+            rowTotal || null,
+          ]);
+        });
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        wsSummary["!cols"] = [
+          { wch: 5 },
+          { wch: 40 },
+          ...months.map(() => ({ wch: 12 })),
+          { wch: 12 },
+        ];
+        wb.SheetNames.unshift("RINGKASAN");
+        wb.Sheets["RINGKASAN"] = wsSummary;
+
+        return wb;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  EXPORT — FLAT MODE
+      // ════════════════════════════════════════════════════════════
+      function buildFlatWorkbook() {
         const activeCols = cols.filter((c) => c.enabled);
         const headers = activeCols.map((c) => c.label);
-        const colMap = {
-          dist: "dist",
-          cust: "cust",
-          bulan: "bulan",
-          barang: "barang",
-          qty: "qty",
-          satuan: "satuan",
-          jumlah: "jumlah",
-        };
+
+        // Filter to period months only
+        const periodData =
+          activePeriodMonths.length > 0
+            ? resultData.filter((r) => {
+                if (!r.bulan) return false;
+                const b = r.bulan.toUpperCase().trim();
+                return activePeriodMonths.some((pm) => {
+                  const pmn = pm.toUpperCase().trim();
+                  return (
+                    b === pmn ||
+                    b.startsWith(pmn.slice(0, 3)) ||
+                    pmn.startsWith(b.slice(0, 3))
+                  );
+                });
+              })
+            : resultData;
 
         const wsData = [
           headers,
-          ...resultData.map((row) =>
+          ...periodData.map((row) =>
             activeCols.map((c) => {
-              const v = row[colMap[c.id]];
+              const v = row[c.id];
               if (v == null) return "";
               if (c.id === "qty" || c.id === "jumlah")
                 return typeof v === "number" ? v : parseFloat(v) || "";
@@ -1081,11 +2007,8 @@
             }),
           ),
         ];
-
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // column widths
-        const wscols = activeCols.map((c) => {
+        ws["!cols"] = activeCols.map((c) => {
           if (c.id === "dist") return { wch: 28 };
           if (c.id === "cust") return { wch: 32 };
           if (c.id === "barang") return { wch: 40 };
@@ -1094,26 +2017,65 @@
           if (c.id === "satuan") return { wch: 10 };
           return { wch: 20 };
         });
-        ws["!cols"] = wscols;
-
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "COLLECT DB");
+        return wb;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  EXPORT BUTTON
+      // ════════════════════════════════════════════════════════════
+      $("btn-export").addEventListener("click", () => {
+        let wb;
+        if (exportMode === "flat") wb = buildFlatWorkbook();
+        else wb = buildROWorkbook();
 
         const now = new Date();
         const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-        XLSX.writeFile(wb, `COLLECT_DB_GABUNGAN_${ts}.xlsx`);
+        const monthLabel =
+          activePeriodMonths.length > 0
+            ? "_" +
+              activePeriodMonths
+                .map((m) => m.slice(0, 3).toUpperCase())
+                .join("-")
+            : "";
+        const suffix = exportMode === "flat" ? "_FLAT" : "_RO";
+        XLSX.writeFile(wb, `COLLECT_DB${suffix}${monthLabel}_${ts}.xlsx`);
       });
 
+      // ════════════════════════════════════════════════════════════
+      //  RESTART
+      // ════════════════════════════════════════════════════════════
       $("btn-restart").addEventListener("click", () => {
         zipFile = null;
         resultData = [];
         errors = [];
+        zipFileList = [];
+        selectedDBs.clear();
+        tplFile = null;
+        tplDistOrder = [];
+        tplMonths = [];
+        tplActive = false;
+        tplDataSheetName = null;
+        periodMode = "auto";
+        targetMonthIdx = -1;
+        activePeriodMonths = [];
+        manualSelectedMonths.clear();
+
         $("file-selected").classList.add("hidden");
+        $("db-sel-card").classList.add("hidden");
         dropZone.classList.remove("hidden");
         $("file-input").value = "";
         $("btn-next-1").disabled = true;
         $("err-summary").classList.add("hidden");
         $("stat-err").style.color = "var(--text)";
+        $("tpl-selected").classList.add("hidden");
+        tplZone.classList.remove("hidden");
+        $("tpl-file-input").value = "";
+        $("export-format-section").classList.add("hidden");
+        $("quarter-preview-wrap").classList.add("hidden");
+        $("sel-target-month").value = "";
+        setPeriodMode("auto");
         cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
         setStep(1);
         showSection("upload");
