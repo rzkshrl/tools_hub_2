@@ -38,14 +38,18 @@
         </div>
         <div class="step" id="step-2">
           <div class="step-num">2</div>
-          <span>Periode &amp; Kolom</span>
+          <span>Mapping DB</span>
         </div>
         <div class="step" id="step-3">
           <div class="step-num">3</div>
-          <span>Proses</span>
+          <span>Periode &amp; Kolom</span>
         </div>
         <div class="step" id="step-4">
           <div class="step-num">4</div>
+          <span>Proses</span>
+        </div>
+        <div class="step" id="step-5">
+          <div class="step-num">5</div>
           <span>Export</span>
         </div>
       </div>
@@ -195,6 +199,54 @@
 
           <div class="btn-row">
             <button class="btn btn-primary" id="btn-next-1" disabled>
+              Lanjut ke Periode &amp; Kolom <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ SECTION 2: DB & Column Mapping ══════════════ -->
+      <div id="sec-mapping" class="section hidden">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-arrows-exchange" aria-hidden="true"></i>
+            Mapping Distributor → Template Sheet
+          </div>
+          <div class="card-sub">
+            Cocokkan file DB (ZIP) dengan sheet di template RO. Sistem
+            mendeteksi otomatis — koreksi jika ada yang salah.
+          </div>
+
+          <div
+            id="mapping-alert"
+            class="alert alert-warning hidden"
+            style="margin-bottom: 1rem"
+          >
+            <i class="ti ti-alert-triangle"></i>
+            <span id="mapping-alert-text"></span>
+          </div>
+
+          <div style="overflow-x: auto">
+            <table class="map-table" id="db-map-table">
+              <thead>
+                <tr>
+                  <th style="width: 200px">File DB (ZIP)</th>
+                  <th style="width: 48px">Conf.</th>
+                  <th style="width: 200px">Sheet Template RO</th>
+                  <th style="width: 140px">Sheet Data DB</th>
+                  <th>Preview Kolom</th>
+                  <th style="width: 60px"></th>
+                </tr>
+              </thead>
+              <tbody id="db-map-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="btn-row" style="margin-top: 1.5rem">
+            <button class="btn" id="btn-back-map">
+              <i class="ti ti-arrow-left"></i> Kembali
+            </button>
+            <button class="btn btn-primary" id="btn-next-map">
               Lanjut ke Periode &amp; Kolom <i class="ti ti-arrow-right"></i>
             </button>
           </div>
@@ -644,14 +696,15 @@
       //  UI HELPERS
       // ════════════════════════════════════════════════════════════
       function showSection(name) {
-        ["upload", "columns", "process", "export"].forEach((s) =>
+        ["upload", "mapping", "columns", "process", "export"].forEach((s) =>
           $("sec-" + s).classList.toggle("hidden", s !== name),
         );
       }
 
       function setStep(n) {
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 5; i++) {
           const el = $("step-" + i);
+          if (!el) continue;
           el.classList.remove("active", "done");
           if (i < n) el.classList.add("done");
           if (i === n) el.classList.add("active");
@@ -1129,16 +1182,24 @@
       // ════════════════════════════════════════════════════════════
       $("btn-next-1").addEventListener("click", () => {
         setStep(2);
+        showSection("mapping");
+        buildDBMapping();
+      });
+
+      $("btn-back-map").addEventListener("click", () => {
+        setStep(1);
+        showSection("upload");
+      });
+
+      $("btn-next-map").addEventListener("click", () => {
+        setStep(3);
         showSection("columns");
         updateModePills();
         renderCols();
         renderMonthChips();
       });
 
-      $("btn-back-1").addEventListener("click", () => {
-        setStep(1);
-        showSection("upload");
-      });
+      // btn-back-1 replaced by btn-back-map
 
       $("btn-next-2").addEventListener("click", () => {
         if (cols.filter((c) => c.enabled).length === 0) {
@@ -1151,7 +1212,7 @@
           return;
         }
         activePeriodMonths = months;
-        setStep(3);
+        setStep(4);
         showSection("process");
         startProcessing();
       });
@@ -1711,7 +1772,7 @@
       // ════════════════════════════════════════════════════════════
       //  PROCESSING
       // ════════════════════════════════════════════════════════════
-      async function startProcessing() {
+      let startProcessing = async function () {
         cancelled = false;
         resultData = [];
         errors = [];
@@ -1794,10 +1855,10 @@
         bulanNormStats = {};
         buildMatcherResults();
         updateFabBadge();
-      }
+      };
 
       function showResults(total) {
-        setStep(4);
+        setStep(5);
         showSection("export");
         updateModePills();
         const distSet = new Set(resultData.map((r) => r.dist));
@@ -2228,6 +2289,9 @@
         matcherCurrentDist = null;
         tplROCustomers = [];
         $("matcher-fab").classList.add("hidden");
+        dbMappings = [];
+        zipFileCache = {};
+        tplSheetNames = [];
         setStep(1);
         showSection("upload");
       });
@@ -2303,7 +2367,7 @@
 
       // Wrap detectAndExtract to normalize bulan on every extracted row
       const _origDetectAndExtract = detectAndExtract;
-      function detectAndExtractWithNorm(wb, fileName) {
+      let detectAndExtractWithNorm = function (wb, fileName) {
         const rows = _origDetectAndExtract(wb, fileName);
         const distName = fileName
           .replace(/\.xlsx$/i, "")
@@ -2322,7 +2386,7 @@
           bulanNormStats[distName] = normMap;
         }
         return rows;
-      }
+      };
 
       // ════════════════════════════════════════════════════════════
       //  FUZZY MATCHING ENGINE (migrated from stock_name_matcher)
@@ -2725,6 +2789,692 @@
       // ════════════════════════════════════════════════════════════
       //  HOOK INTO PROCESSING — show FAB after process completes
       // ════════════════════════════════════════════════════════════
+
+      // ════════════════════════════════════════════════════════════
+      //  DB MAPPING ENGINE
+      //  State: dbMappings = [{dbShortName, tplSheetName, dbSheetName, colMap, confidence, sampleRows}]
+      // ════════════════════════════════════════════════════════════
+      let dbMappings = []; // master mapping list
+      let zipFileCache = {}; // shortName → ArrayBuffer (cached when ZIP loaded)
+      let tplSheetNames = []; // sheet names from template (excluding Sheet1)
+
+      // Column slots we need to fill for every distributor
+      const COL_SLOTS = ["cust", "bulan", "barang", "qty", "satuan", "jumlah"];
+      const COL_LABELS = {
+        cust: "Nama Customer",
+        bulan: "Bulan",
+        barang: "Nama Barang",
+        qty: "QTY",
+        satuan: "Satuan",
+        jumlah: "Jumlah/Nilai",
+      };
+
+      // Known header aliases per slot (for auto-detect)
+      const COL_ALIASES = {
+        cust: [
+          "nama customer",
+          "customer",
+          "nama pelanggan",
+          "pelanggan",
+          "nmcust",
+          "nama toko",
+          "toko",
+          "cust",
+          "outlet",
+          "nama outlet",
+        ],
+        bulan: [
+          "bulan",
+          "bln",
+          "bulan faktur",
+          "month",
+          "periode",
+          "tanggal",
+          "tgl",
+          "date",
+          "range[tanggal]",
+        ],
+        barang: [
+          "nama barang",
+          "barang",
+          "produk",
+          "nama produk",
+          "item",
+          "nmbrg",
+          "nama item",
+          "kode barang",
+          "namabrg",
+          "range[namabrg]",
+        ],
+        qty: [
+          "qty",
+          "kuantitas",
+          "jumlah barang",
+          "volume",
+          "quantity",
+          "range[qty]",
+          "jumlah",
+          "qyt",
+        ],
+        satuan: ["satuan", "uom", "unit", "sat", "range[satuan]"],
+        jumlah: [
+          "neto",
+          "net amount",
+          "subtotal",
+          "total harga",
+          "nilai",
+          "jumlah rupiah",
+          "amount",
+          "dpp",
+          "harga jual",
+          "total",
+          "nilai retur",
+        ],
+      };
+
+      // Fuzzy sheet name matcher (for DB file → template sheet)
+      function matchSheetToTemplate(dbName, tplSheets) {
+        const norm = (s) =>
+          s
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        const nd = norm(dbName);
+        // exact
+        let hit = tplSheets.find((s) => norm(s) === nd);
+        if (hit) return { sheet: hit, score: 100 };
+        // token overlap
+        const dw = new Set(nd.split(" ").filter((w) => w.length > 1));
+        let best = null,
+          bestScore = 0;
+        tplSheets.forEach((s) => {
+          const sw = norm(s)
+            .split(" ")
+            .filter((w) => w.length > 1);
+          const overlap = sw.filter((w) => dw.has(w)).length;
+          const score = overlap / Math.max(dw.size, sw.length, 1);
+          if (score > bestScore) {
+            bestScore = score;
+            best = s;
+          }
+        });
+        if (bestScore >= 0.4)
+          return { sheet: best, score: Math.round(bestScore * 100) };
+        // bigram
+        function bg(s) {
+          const r = {};
+          for (let i = 0; i < s.length - 1; i++) {
+            const k = s[i] + s[i + 1];
+            r[k] = (r[k] || 0) + 1;
+          }
+          return r;
+        }
+        let bestBi = null,
+          bestBiScore = 0;
+        tplSheets.forEach((s) => {
+          const na = norm(dbName),
+            nb = norm(s);
+          const ba = bg(na),
+            bb = bg(nb);
+          let inter = 0,
+            tA = 0,
+            tB = 0;
+          Object.keys(ba).forEach((k) => {
+            tA += ba[k];
+            if (bb[k]) inter += Math.min(ba[k], bb[k]);
+          });
+          Object.keys(bb).forEach((k) => {
+            tB += bb[k];
+          });
+          const sc = tA + tB - inter > 0 ? inter / (tA + tB - inter) : 0;
+          if (sc > bestBiScore) {
+            bestBiScore = sc;
+            bestBi = s;
+          }
+        });
+        if (bestBiScore >= 0.25)
+          return { sheet: bestBi, score: Math.round(bestBiScore * 100) };
+        return { sheet: null, score: 0 };
+      }
+
+      // Auto-detect best sheet in DB file for data extraction
+      function detectBestSheet(wb) {
+        const priority = [
+          "laporan_penjualan_format2",
+          "rincian penjualan per barang",
+          "penjualan_by_salesman",
+          "data",
+          "page1",
+          "sheet1",
+          "sheet4",
+        ];
+        for (const p of priority) {
+          const hit = wb.SheetNames.find(
+            (s) =>
+              s.toLowerCase().replace(/[^a-z0-9]/g, "") ===
+              p.replace(/[^a-z0-9]/g, ""),
+          );
+          if (hit) return hit;
+        }
+        // Find sheet with most rows
+        let bestSheet = wb.SheetNames[0],
+          bestRows = 0;
+        wb.SheetNames.forEach((sn) => {
+          const ws = wb.Sheets[sn];
+          const ref = ws["!ref"];
+          if (!ref) return;
+          const range = XLSX.utils.decode_range(ref);
+          if (range.e.r > bestRows) {
+            bestRows = range.e.r;
+            bestSheet = sn;
+          }
+        });
+        return bestSheet;
+      }
+
+      // Auto-detect column indices from header row
+      function detectCols(ws) {
+        const data = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          defval: null,
+          raw: true,
+        });
+        if (!data.length) return { map: {}, hdrRow: -1, hdrCells: [] };
+
+        // Find header row (first row with ≥3 non-null cells that contain text)
+        let hdrIdx = -1;
+        for (let i = 0; i < Math.min(data.length, 10); i++) {
+          const row = data[i] || [];
+          const textCells = row.filter(
+            (v) => v && typeof v === "string" && v.trim().length > 1,
+          );
+          if (textCells.length >= 3) {
+            hdrIdx = i;
+            break;
+          }
+        }
+        if (hdrIdx < 0) return { map: {}, hdrRow: -1, hdrCells: [] };
+
+        const hdr = (data[hdrIdx] || []).map((v) =>
+          String(v || "")
+            .toLowerCase()
+            .trim(),
+        );
+        const map = {};
+        const str = (s) =>
+          String(s || "")
+            .toLowerCase()
+            .trim();
+
+        COL_SLOTS.forEach((slot) => {
+          const aliases = COL_ALIASES[slot];
+          // exact match first
+          let idx = hdr.findIndex((h) => aliases.includes(h));
+          if (idx >= 0) {
+            map[slot] = idx;
+            return;
+          }
+          // partial match
+          idx = hdr.findIndex((h) =>
+            aliases.some((a) => h.includes(a) || a.includes(h)),
+          );
+          if (idx >= 0) {
+            map[slot] = idx;
+            return;
+          }
+          map[slot] = -1;
+        });
+
+        // Special: if bulan not found but tanggal/date found, use date col (will convert later)
+        if (map.bulan < 0) {
+          const dateIdx = hdr.findIndex(
+            (h) =>
+              h.includes("tanggal") ||
+              h.includes("date") ||
+              h.includes("tgl") ||
+              h.includes("range[tanggal]"),
+          );
+          if (dateIdx >= 0) map.bulan = dateIdx;
+        }
+
+        // Get sample values from first data row after header
+        const sampleRow = data[hdrIdx + 1] || [];
+        return {
+          map,
+          hdrRow: hdrIdx,
+          hdrCells: hdr,
+          sampleRow,
+        };
+      }
+
+      // ── Build mapping for all selected DBs ──
+      async function buildDBMapping() {
+        dbMappings = [];
+        zipFileCache = {};
+
+        // Get tpl sheet names (if template loaded)
+        tplSheetNames = [];
+        if (tplFile) {
+          const ab = await tplFile.arrayBuffer();
+          const wb = XLSX.read(ab, { type: "array", raw: true });
+          tplSheetNames = wb.SheetNames.filter((s) => s !== "Sheet1");
+        }
+
+        // Read ZIP and analyze each selected DB
+        const zip = await JSZip.loadAsync(zipFile);
+        const selectedFiles = Object.keys(zip.files).filter(
+          (n) =>
+            n.match(/\.xlsx$/i) &&
+            !zip.files[n].dir &&
+            !n.includes("~$") &&
+            selectedDBs.has(n.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, "")),
+        );
+
+        // Show loading state
+        const tbody = document.getElementById("db-map-tbody");
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text3)">
+          <i class="ti ti-loader" style="font-size:20px"></i> Menganalisis ${selectedFiles.length} file...</td></tr>`;
+
+        for (const filePath of selectedFiles) {
+          const shortName = filePath
+            .replace(/^.*[\\\/]/, "")
+            .replace(/\.xlsx$/i, "");
+          try {
+            const ab = await zip.files[filePath].async("arraybuffer");
+            zipFileCache[shortName] = ab;
+            const wb = XLSX.read(ab, {
+              type: "array",
+              raw: true,
+              cellDates: true,
+            });
+
+            // Match to template sheet
+            const tplMatch =
+              tplSheetNames.length > 0
+                ? matchSheetToTemplate(shortName, tplSheetNames)
+                : { sheet: null, score: 0 };
+
+            // Detect best data sheet in DB file
+            const dbSheetName = detectBestSheet(wb);
+            const ws = wb.Sheets[dbSheetName];
+            const { map: colMap, hdrRow, hdrCells, sampleRow } = detectCols(ws);
+
+            // Count matched slots
+            const matched = COL_SLOTS.filter((s) => colMap[s] >= 0).length;
+            const colConf = Math.round((matched / COL_SLOTS.length) * 100);
+
+            dbMappings.push({
+              shortName,
+              tplSheetName: tplMatch.sheet,
+              tplConf: tplMatch.score,
+              dbSheetName,
+              dbSheetNames: wb.SheetNames.filter((s) => !s.includes("~")),
+              colMap,
+              hdrRow,
+              hdrCells,
+              sampleRow,
+              colConf,
+              wb, // keep in memory for re-analysis
+            });
+          } catch (e) {
+            dbMappings.push({
+              shortName,
+              tplSheetName: null,
+              tplConf: 0,
+              dbSheetName: "—",
+              dbSheetNames: [],
+              colMap: {},
+              hdrRow: -1,
+              hdrCells: [],
+              sampleRow: [],
+              colConf: 0,
+              error: e.message,
+            });
+          }
+        }
+
+        renderMappingTable();
+        updateMappingAlert();
+      }
+
+      function renderMappingTable() {
+        const tbody = document.getElementById("db-map-tbody");
+        tbody.innerHTML = "";
+
+        dbMappings.forEach((m, idx) => {
+          const confColor =
+            m.tplConf >= 70 ? "high" : m.tplConf >= 35 ? "med" : "low";
+          const colConfColor =
+            m.colConf >= 80 ? "high" : m.colConf >= 50 ? "med" : "low";
+          const badgeCls =
+            m.colConf >= 80 ? "ok" : m.colConf >= 50 ? "warn" : "err";
+
+          // Template sheet select
+          const tplOptions = ["— Tidak dipakai —", ...tplSheetNames]
+            .map(
+              (s) =>
+                `<option value="${esc(s)}" ${m.tplSheetName === s ? "selected" : ""}>${esc(s)}</option>`,
+            )
+            .join("");
+
+          // DB sheet select
+          const dbOptions = m.dbSheetNames
+            .map(
+              (s) =>
+                `<option value="${esc(s)}" ${m.dbSheetName === s ? "selected" : ""}>${esc(s)}</option>`,
+            )
+            .join("");
+
+          const tr = document.createElement("tr");
+          tr.dataset.idx = idx;
+          tr.innerHTML = `
+            <td style="font-weight:500">${esc(m.shortName)}</td>
+            <td style="text-align:center">
+              <span class="conf-dot ${confColor}" title="Confidence: ${m.tplConf}%"></span>
+            </td>
+            <td>
+              ${
+                tplSheetNames.length > 0
+                  ? `<select class="map-sel ${m.tplConf >= 70 ? "ok" : m.tplConf >= 35 ? "" : "warn"}" data-idx="${idx}" data-field="tpl" onchange="onMapChange(this)">${tplOptions}</select>`
+                  : '<span style="font-size:12px;color:var(--text3)">—</span>'
+              }
+            </td>
+            <td>
+              <select class="map-sel" data-idx="${idx}" data-field="dbSheet" onchange="onDbSheetChange(this)">${dbOptions}</select>
+            </td>
+            <td>
+              <span class="map-badge ${badgeCls}">${m.colConf}% kolom terdeteksi</span>
+              <button class="expand-btn" onclick="toggleColMap(${idx})" id="expand-${idx}">
+                <i class="ti ti-settings" style="font-size:12px"></i> Kustomisasi
+              </button>
+              <div class="colmap-panel" id="colmap-${idx}">
+                ${renderColMapPanel(m, idx)}
+              </div>
+            </td>
+            <td>
+              ${m.error ? `<span class="map-badge err" title="${esc(m.error)}"><i class="ti ti-alert-circle"></i></span>` : ""}
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderColMapPanel(m, idx) {
+        if (!m.hdrCells || m.hdrCells.length === 0) {
+          return '<div style="font-size:12px;color:var(--text3)">Header tidak terdeteksi. Pilih sheet data yang benar dahulu.</div>';
+        }
+        const opts = [
+          ["—", -1],
+          ...m.hdrCells.map((h, i) => [h || `(kolom ${i})`, i]),
+        ]
+          .map(
+            ([label, val]) =>
+              `<option value="${val}">${esc(label.slice(0, 40))}</option>`,
+          )
+          .join("");
+
+        let html = `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+          Sheet: <span class="sheet-pill">${esc(m.dbSheetName)}</span>
+          &nbsp;·&nbsp; Header row: ${m.hdrRow >= 0 ? m.hdrRow + 1 : "?"}
+          &nbsp;·&nbsp; ${m.hdrCells.length} kolom terdeteksi
+        </div>
+        <div class="colmap-grid">`;
+
+        COL_SLOTS.forEach((slot) => {
+          const curIdx = m.colMap[slot] ?? -1;
+          const sampleVal =
+            curIdx >= 0 && m.sampleRow ? m.sampleRow[curIdx] : null;
+          const sampleStr =
+            sampleVal != null ? String(sampleVal).slice(0, 30) : "—";
+          // Build select with current selected
+          const slotOpts = [
+            ["— Tidak dipakai —", -1],
+            ...m.hdrCells.map((h, i) => [h || `(kolom ${i})`, i]),
+          ]
+            .map(
+              ([label, val]) =>
+                `<option value="${val}" ${Number(val) === Number(curIdx) ? "selected" : ""}>${esc(String(label).slice(0, 40))}</option>`,
+            )
+            .join("");
+          html += `<div>
+            <div class="colmap-row">
+              <span class="colmap-label">${COL_LABELS[slot]}</span>
+              <select class="map-sel" style="flex:1" data-idx="${idx}" data-slot="${slot}" onchange="onColMapChange(this)">${slotOpts}</select>
+            </div>
+            <div class="colmap-preview" title="${esc(sampleStr)}">▸ ${esc(sampleStr)}</div>
+          </div>`;
+        });
+        html += "</div>";
+        return html;
+      }
+
+      function toggleColMap(idx) {
+        const panel = document.getElementById("colmap-" + idx);
+        panel.classList.toggle("open");
+        const btn = document.getElementById("expand-" + idx);
+        btn.querySelector("i").className = panel.classList.contains("open")
+          ? "ti ti-chevron-up"
+          : "ti ti-settings";
+        btn.style.fontSize = "12px";
+      }
+
+      function onMapChange(sel) {
+        const idx = parseInt(sel.dataset.idx);
+        const val = sel.value;
+        dbMappings[idx].tplSheetName = val === "— Tidak dipakai —" ? null : val;
+        const conf = dbMappings[idx].tplConf;
+        sel.className =
+          "map-sel " + (val && val !== "— Tidak dipakai —" ? "ok" : "warn");
+        updateMappingAlert();
+      }
+
+      function onDbSheetChange(sel) {
+        const idx = parseInt(sel.dataset.idx);
+        const sheetName = sel.value;
+        const m = dbMappings[idx];
+        if (!m.wb) return;
+        m.dbSheetName = sheetName;
+        const ws = m.wb.Sheets[sheetName];
+        const { map, hdrRow, hdrCells, sampleRow } = detectCols(ws);
+        m.colMap = map;
+        m.hdrRow = hdrRow;
+        m.hdrCells = hdrCells;
+        m.sampleRow = sampleRow;
+        const matched = COL_SLOTS.filter((s) => map[s] >= 0).length;
+        m.colConf = Math.round((matched / COL_SLOTS.length) * 100);
+        // Re-render that row's col panel
+        const panel = document.getElementById("colmap-" + idx);
+        const isOpen = panel.classList.contains("open");
+        panel.innerHTML = renderColMapPanel(m, idx);
+        if (isOpen) panel.classList.add("open");
+        // Update badge
+        const tr = panel.closest("tr");
+        const badgeCls =
+          m.colConf >= 80 ? "ok" : m.colConf >= 50 ? "warn" : "err";
+        tr.querySelector(".map-badge").className = `map-badge ${badgeCls}`;
+        tr.querySelector(".map-badge").textContent =
+          `${m.colConf}% kolom terdeteksi`;
+      }
+
+      function onColMapChange(sel) {
+        const idx = parseInt(sel.dataset.idx);
+        const slot = sel.dataset.slot;
+        const val = parseInt(sel.value);
+        dbMappings[idx].colMap[slot] = val;
+        // Update preview
+        const sampleVal =
+          val >= 0 && dbMappings[idx].sampleRow
+            ? dbMappings[idx].sampleRow[val]
+            : null;
+        const preview = sel.closest("div").nextElementSibling;
+        if (preview)
+          preview.textContent =
+            "▸ " + (sampleVal != null ? String(sampleVal).slice(0, 30) : "—");
+        sel.classList.add("changed");
+      }
+
+      function updateMappingAlert() {
+        const unmapped = dbMappings.filter(
+          (m) => tplSheetNames.length > 0 && !m.tplSheetName,
+        );
+        const lowCol = dbMappings.filter((m) => m.colConf < 50 && !m.error);
+        const alertEl = document.getElementById("mapping-alert");
+        const alertText = document.getElementById("mapping-alert-text");
+        if (unmapped.length > 0 || lowCol.length > 0) {
+          alertEl.classList.remove("hidden");
+          const parts = [];
+          if (unmapped.length)
+            parts.push(`${unmapped.length} DB tidak cocok ke sheet template`);
+          if (lowCol.length)
+            parts.push(`${lowCol.length} DB dengan deteksi kolom < 50%`);
+          alertText.textContent =
+            parts.join(" · ") +
+            " — review dan koreksi di bawah sebelum melanjutkan.";
+        } else {
+          alertEl.classList.add("hidden");
+        }
+      }
+
+      // ── Hook: replace startProcessing to use dbMappings ──
+      // Override detectAndExtractWithNorm to use the colMap from dbMappings
+      const _origDetectAndExtractWithNorm = detectAndExtractWithNorm;
+      detectAndExtractWithNorm = function (wb2, fileName) {
+        const shortName = fileName
+          .replace(/\.xlsx$/i, "")
+          .replace(/^.*[\\\/]/, "");
+        const mapping = dbMappings.find((m) => m.shortName === shortName);
+        if (!mapping || !mapping.hdrCells || mapping.hdrCells.length === 0) {
+          // fallback to original heuristic
+          return _origDetectAndExtractWithNorm(wb2, fileName);
+        }
+        // Use mapped column indices
+        const ws = wb2.Sheets[mapping.dbSheetName];
+        if (!ws) return _origDetectAndExtractWithNorm(wb2, fileName);
+
+        const data = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          defval: null,
+          raw: true,
+          cellDates: true,
+        });
+        const startRow = mapping.hdrRow + 1;
+        const colMap = mapping.colMap;
+        const col = (row, idx) =>
+          idx >= 0 && idx < row.length ? row[idx] : null;
+        const str = (v) => (v == null ? "" : String(v).trim());
+
+        const rows = data
+          .slice(startRow)
+          .filter((r) => r.some((v) => v != null))
+          .map((r) => ({
+            dist: shortName,
+            cust: str(col(r, colMap.cust)),
+            bulan: normalizeBulan(
+              col(r, colMap.bulan) instanceof Date
+                ? MONTH_NAMES[col(r, colMap.bulan).getMonth()]
+                : col(r, colMap.bulan),
+            ),
+            barang: str(col(r, colMap.barang)),
+            qty: col(r, colMap.qty),
+            satuan: str(col(r, colMap.satuan)),
+            jumlah: col(r, colMap.jumlah),
+          }))
+          .filter((r) => r.cust && r.barang);
+
+        if (rows.length === 0)
+          return _origDetectAndExtractWithNorm(wb2, fileName);
+
+        // Apply bulan normalization tracking
+        const normMap = {};
+        rows.forEach((row) => {
+          const orig = row._bulanRaw;
+          if (orig && orig !== row.bulan) normMap[orig] = row.bulan;
+        });
+        if (Object.keys(normMap).length > 0)
+          bulanNormStats[shortName] = normMap;
+
+        return rows;
+      };
+
+      // ── Hook startProcessing to use cached ArrayBuffers from buildDBMapping ──
+      const _origStartProcessing = startProcessing;
+      startProcessing = async function () {
+        // If we have cached ABs from mapping phase, use them directly
+        if (Object.keys(zipFileCache).length > 0) {
+          cancelled = false;
+          resultData = [];
+          errors = [];
+          bulanNormStats = {};
+          document.getElementById("log-box").innerHTML = "";
+          setProgress(0, "Memproses data...");
+          document.getElementById("process-sub").textContent =
+            "Memproses file...";
+          log(`Periode RO: ${activePeriodMonths.join(" → ")}`, "info");
+          if (tplActive)
+            log(
+              `Mode: Template RO — ${tplDistOrder.length} distributor`,
+              "info",
+            );
+
+          const entries = dbMappings.filter((m) => !m.error);
+          for (let i = 0; i < entries.length; i++) {
+            if (cancelled) {
+              log("Proses dibatalkan.", "err");
+              return;
+            }
+            const m = entries[i];
+            setProgress((i / entries.length) * 90, `Memproses: ${m.shortName}`);
+            document.getElementById("process-sub").textContent =
+              `Memproses file ${i + 1} dari ${entries.length}...`;
+            try {
+              const ab = zipFileCache[m.shortName];
+              if (!ab) throw new Error("Cache tidak ditemukan");
+              const wb2 = XLSX.read(ab, {
+                type: "array",
+                cellDates: true,
+                raw: true,
+              });
+              const rows = detectAndExtractWithNorm(wb2, m.shortName);
+              if (rows.length === 0) {
+                log(`⚠ ${m.shortName}: tidak ada data`, "err");
+                errors.push({
+                  name: m.shortName,
+                  reason: "Tidak ada data atau format tidak dikenali",
+                });
+              } else {
+                resultData.push(...rows);
+                log(
+                  `✓ ${m.shortName}: ${rows.length.toLocaleString()} baris`,
+                  "ok",
+                );
+              }
+            } catch (e) {
+              log(`✗ ${m.shortName}: ${e.message}`, "err");
+              errors.push({ name: m.shortName, reason: e.message });
+            }
+            await new Promise((r) => setTimeout(r, 10));
+          }
+
+          // Also handle DB files with errors in mapping phase
+          dbMappings
+            .filter((m) => m.error)
+            .forEach((m) => {
+              errors.push({ name: m.shortName, reason: m.error });
+            });
+
+          if (cancelled) return;
+          setProgress(100, "Selesai!");
+          $("matcher-fab").classList.remove("hidden");
+          buildMatcherResults();
+          updateFabBadge();
+          showResults(
+            entries.length + dbMappings.filter((m) => m.error).length,
+          );
+        } else {
+          // fallback: no mapping done, use original processing
+          return _origStartProcessing();
+        }
+      };
     </script>
   </body>
 </html>
