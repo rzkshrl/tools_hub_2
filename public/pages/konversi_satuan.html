@@ -12,6 +12,7 @@
     />
   </head>
   <body>
+    <script type="module" src="/src/main.js"></script>
     <div class="tip" id="tipBox"></div>
     <div class="toast-wrap" id="toastWrap"></div>
 
@@ -95,7 +96,10 @@
       </div>
       <div class="header-right">
         <button class="btn-ghost btn-sm" onclick="showHelp()">
-          ❓ Panduan
+          ❓ 1. Panduan
+        </button>
+        <button class="btn-ghost btn-sm" onclick="loadPage('panduan_konversi')">
+          ❓ 2. Panduan Lengkap
         </button>
         <button class="btn-ghost btn-sm" onclick="resetAll()">🔄 Reset</button>
       </div>
