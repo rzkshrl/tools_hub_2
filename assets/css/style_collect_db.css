@@ -1643,6 +1643,3 @@ table.mtbl tr:hover td {
   color: var(--green);
   font-weight: 500;
 }
-.norm-table tr:last-child td {
-  border-bottom: none;
-}

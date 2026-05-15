@@ -1073,6 +1073,42 @@
           $("tpl-months-info").textContent = months.length
             ? `Kolom bulan dari template: ${months.join(" · ")}`
             : "Kolom bulan tidak terdeteksi — akan menggunakan pilihan periode";
+
+          // Extract customer names for fuzzy matching
+          tplROCustomers = [];
+          try {
+            const custs = new Set();
+            for (const sn of wb.SheetNames) {
+              if (sn === "Sheet1") continue;
+              const ws2 = wb.Sheets[sn];
+              const d2 = XLSX.utils.sheet_to_json(ws2, {
+                header: 1,
+                defval: null,
+                raw: true,
+              });
+              const h2 = (d2[0] || []).map((v) =>
+                String(v || "").toUpperCase(),
+              );
+              const ci = h2.findIndex(
+                (h) => h.includes("CUSTOMER") || h.includes("PELANGGAN"),
+              );
+              if (ci >= 0) {
+                d2.slice(1).forEach((row) => {
+                  const v = row[ci];
+                  if (
+                    v &&
+                    typeof v === "string" &&
+                    v.trim() &&
+                    !v.toUpperCase().startsWith("TOTAL")
+                  )
+                    custs.add(v.trim());
+                });
+              }
+            }
+            tplROCustomers = Array.from(custs);
+          } catch (e2) {
+            tplROCustomers = [];
+          }
         } catch (e) {
           alert("Gagal membaca file template: " + e.message);
         }
@@ -2688,73 +2724,7 @@
 
       // ════════════════════════════════════════════════════════════
       //  HOOK INTO PROCESSING — show FAB after process completes
-      //  And extract RO customers from template if available
       // ════════════════════════════════════════════════════════════
-      const _origHandleTplFile = handleTplFile;
-      async function handleTplFile(f) {
-        await _origHandleTplFile(f);
-        // After template is loaded, extract customer names from data sheets
-        try {
-          const ab = await f.arrayBuffer();
-          const wb = XLSX.read(ab, { type: "array", raw: true });
-          const custs = new Set();
-          for (const sn of wb.SheetNames) {
-            if (sn === "Sheet1") continue;
-            const ws = wb.Sheets[sn];
-            const data = XLSX.utils.sheet_to_json(ws, {
-              header: 1,
-              defval: null,
-              raw: true,
-            });
-            // Find NAMA CUSTOMER column
-            const hdr = (data[0] || []).map((v) =>
-              String(v || "").toUpperCase(),
-            );
-            const custIdx = hdr.findIndex(
-              (h) => h.includes("CUSTOMER") || h.includes("PELANGGAN"),
-            );
-            if (custIdx >= 0) {
-              data.slice(1).forEach((row) => {
-                const v = row[custIdx];
-                if (
-                  v &&
-                  typeof v === "string" &&
-                  v.trim() &&
-                  !v.toUpperCase().startsWith("TOTAL")
-                ) {
-                  custs.add(v.trim());
-                }
-              });
-            }
-          }
-          // Also from Sheet1 customer list
-          if (wb.SheetNames.includes("Sheet1")) {
-            const ws = wb.Sheets["Sheet1"];
-            const data = XLSX.utils.sheet_to_json(ws, {
-              header: 1,
-              defval: null,
-              raw: true,
-            });
-            data.forEach((row) => {
-              (row || []).forEach((v) => {
-                if (
-                  v &&
-                  typeof v === "string" &&
-                  v.trim().length > 2 &&
-                  !v.toUpperCase().startsWith("TOTAL") &&
-                  !v.toUpperCase().includes("DISTRIBUTOR") &&
-                  !v.toUpperCase().includes("REGION")
-                ) {
-                  // heuristic: likely a customer name if it has spaces or specific patterns
-                }
-              });
-            });
-          }
-          tplROCustomers = Array.from(custs);
-        } catch (e) {
-          tplROCustomers = [];
-        }
-      }
     </script>
   </body>
 </html>
