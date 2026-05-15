@@ -462,6 +462,109 @@
           </div>
         </div>
       </div>
+
+      <!-- ══════════════ CUSTOMER MATCHER FAB ══════════════ -->
+      <button
+        class="matcher-fab hidden"
+        id="matcher-fab"
+        onclick="openMatcher()"
+      >
+        <i class="ti ti-users-group" aria-hidden="true"></i>
+        Cek Nama Customer
+        <span class="badge" id="matcher-fab-badge">!</span>
+      </button>
+
+      <!-- ══════════════ MATCHER OVERLAY ══════════════ -->
+      <div class="matcher-overlay hidden" id="matcher-overlay">
+        <div class="matcher-panel">
+          <div class="matcher-header">
+            <i
+              class="ti ti-users-group"
+              aria-hidden="true"
+              style="font-size: 18px; color: var(--blue)"
+            ></i>
+            <h2>Customer Name Matcher — Crosscheck &amp; Koreksi</h2>
+            <button
+              class="matcher-close"
+              onclick="closeMatcher()"
+              title="Tutup"
+            >
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <div class="matcher-body">
+            <div class="matcher-tabs">
+              <button
+                class="mtab active"
+                id="mtab-bulan"
+                onclick="switchMTab('bulan')"
+              >
+                ⚠ Normalisasi Bulan
+              </button>
+              <button class="mtab" id="mtab-cust" onclick="switchMTab('cust')">
+                🔍 Fuzzy Customer Match
+              </button>
+            </div>
+
+            <!-- TAB: Bulan Normalization -->
+            <div class="mtab-content active" id="mtab-content-bulan">
+              <div
+                style="
+                  font-size: 13px;
+                  color: var(--text2);
+                  margin-bottom: 0.875rem;
+                "
+              >
+                Beberapa distributor menggunakan format bulan yang berbeda (mis.
+                <strong>MJAP</strong>: "January", <strong>UD Sejahtera</strong>:
+                "Jan 2026"). Tool ini mendeteksi dan menormalisasi otomatis ke
+                format Bahasa Indonesia standar.
+              </div>
+              <div id="bulan-norm-report"></div>
+            </div>
+
+            <!-- TAB: Customer Fuzzy Match -->
+            <div class="mtab-content" id="mtab-content-cust">
+              <div
+                style="
+                  font-size: 13px;
+                  color: var(--text2);
+                  margin-bottom: 0.875rem;
+                "
+              >
+                Bandingkan nama customer di data DB dengan template RO. Pilih
+                distributor, lalu review hasil matching — kamu bisa ubah pilihan
+                match sebelum export.
+              </div>
+              <div id="matcher-dist-grid" class="matcher-dist-grid"></div>
+              <div id="matcher-table-wrap">
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--text3);
+                    text-align: center;
+                    padding: 2rem 0;
+                  "
+                >
+                  Pilih distributor di atas untuk melihat hasil matching
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="matcher-footer">
+            <div class="matcher-status" id="matcher-status">—</div>
+            <button
+              class="btn btn-primary"
+              id="btn-apply-matches"
+              onclick="applyMatchOverrides()"
+              style="display: none"
+            >
+              <i class="ti ti-check"></i> Terapkan Koreksi ke Data
+            </button>
+            <button class="btn" onclick="closeMatcher()">Tutup</button>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- /app -->
 
@@ -618,36 +721,6 @@
         ];
       }
 
-      // English month names → index (for distributors with EN locale data, e.g. MJAP)
-      const MONTH_EN = [
-        "JANUARY",
-        "FEBRUARY",
-        "MARCH",
-        "APRIL",
-        "MAY",
-        "JUNE",
-        "JULY",
-        "AUGUST",
-        "SEPTEMBER",
-        "OCTOBER",
-        "NOVEMBER",
-        "DECEMBER",
-      ];
-      const MONTH_EN_SHORT = [
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "MAY",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-      ];
-
       // Normalize month string to index (0-11), returns -1 if unrecognized
       function parseMonthIdx(s) {
         if (!s) return -1;
@@ -656,12 +729,7 @@
         if (fullIdx >= 0) return fullIdx;
         const shortIdx = MONTH_SHORT.findIndex((m) => m === t.slice(0, 3));
         if (shortIdx >= 0) return shortIdx;
-        // Try English month names (e.g. "January", "Jan 2026")
-        const enFull = MONTH_EN.findIndex((m) => t.startsWith(m));
-        if (enFull >= 0) return enFull;
-        const enShort = MONTH_EN_SHORT.findIndex((m) => t.startsWith(m));
-        if (enShort >= 0) return enShort;
-        // Try partial Indonesian
+        // Try partial
         const partial = MONTH_NAMES.findIndex((m) =>
           m.toUpperCase().startsWith(t.slice(0, 3)),
         );
@@ -1130,9 +1198,6 @@
         if (typeof v === "string") {
           const t = v.trim();
           if (/^\d+$/.test(t)) return MONTH_NAMES[parseInt(t) - 1] || t;
-          // Normalize English month names → Indonesian (e.g. "January" → "Januari", "Jan 2026" → "Januari")
-          const idx = parseMonthIdx(t);
-          if (idx >= 0) return MONTH_NAMES[idx];
           return t;
         }
         return v || "";
@@ -1178,26 +1243,8 @@
             raw: true,
           });
           if (data.length > 1) {
-            const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
+            const hdr = data[0] || [];
             const isSAJ = str(hdr[0]).toLowerCase().includes("cabang");
-            // Detect format by header:
-            // Format A (UD Sejahtera): Nomor#, Tanggal, Kode#, Nama Barang, Kuantitas, Satuan, @Harga, Penjualan, DPP, Bulan, Nama Pelanggan...
-            // Format B (generic): col[4]=Nama Pelanggan, col[8]=Nama Barang, dll
-            const custIdx = hdr.findIndex(
-              (h) => h.includes("NAMA PELANGGAN") || h.includes("CUSTOMER"),
-            );
-            const brgIdx = hdr.findIndex(
-              (h) => h.includes("NAMA BARANG") || h.includes("PRODUK"),
-            );
-            const blnIdx = hdr.findIndex((h) => h === "BULAN" || h === "BLN");
-            const qtyIdx = hdr.findIndex(
-              (h) => h === "KUANTITAS" || h === "QTY",
-            );
-            const satIdx = hdr.findIndex((h) => h === "SATUAN" || h === "SAT");
-            // DPP col: prefer "PENJUALAN" (numeric) over "DPP" (may contain formula)
-            const jmlIdx = hdr.findIndex(
-              (h) => h === "PENJUALAN" || h === "DPP" || h.includes("JUMLAH"),
-            );
             rows = data
               .slice(1)
               .filter((r) => r.some((v) => v != null))
@@ -1212,22 +1259,7 @@
                     satuan: str(col(r, 8)),
                     jumlah: col(r, 10),
                   };
-                else if (custIdx >= 0 && brgIdx >= 0)
-                  // Format A: header-detected (e.g. UD Sejahtera)
-                  return {
-                    dist: distName,
-                    cust: str(col(r, custIdx)),
-                    bulan:
-                      blnIdx >= 0
-                        ? getMonthName(str(col(r, blnIdx)))
-                        : getMonthName(xlsxDateToJS(col(r, 1))),
-                    barang: str(col(r, brgIdx)),
-                    qty: qtyIdx >= 0 ? col(r, qtyIdx) : col(r, 4),
-                    satuan: satIdx >= 0 ? str(col(r, satIdx)) : str(col(r, 5)),
-                    jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : col(r, 7),
-                  };
                 else
-                  // Format B: legacy fixed-index fallback
                   return {
                     dist: distName,
                     cust: str(col(r, 4)),
@@ -1258,7 +1290,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, 2)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1296,7 +1328,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 5)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, 11)),
                 qty: col(r, 14),
                 satuan: str(col(r, 15)),
@@ -1334,7 +1366,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 6)),
-                bulan: getMonthName(str(col(r, 4))),
+                bulan: str(col(r, 4)),
                 barang: str(col(r, 8)),
                 qty: col(r, 9),
                 satuan: str(col(r, 10)),
@@ -1353,7 +1385,7 @@
               .map((r) => ({
                 dist: dn,
                 cust: str(col(r, 2)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1430,7 +1462,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, 3)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, 4)),
                 qty: col(r, 5),
                 satuan: str(col(r, 6)),
@@ -1453,7 +1485,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, custIdx)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, brgIdx >= 0 ? brgIdx : 5)),
                 qty: col(r, qtyIdx),
                 satuan: str(col(r, satIdx >= 0 ? satIdx : qtyIdx + 1)),
@@ -1469,7 +1501,7 @@
               .map((r) => ({
                 dist: distName,
                 cust: str(col(r, custIdx >= 0 ? custIdx : 10)),
-                bulan: getMonthName(str(col(r, 1))),
+                bulan: str(col(r, 1)),
                 barang: str(col(r, 5)),
                 qty: col(r, qtyIdx >= 0 ? qtyIdx : 12),
                 satuan: str(col(r, satIdx >= 0 ? satIdx : 13)),
@@ -1527,7 +1559,7 @@
                   .map((r) => ({
                     dist: dn,
                     cust: str(col(r, custIdx)),
-                    bulan: blnIdx >= 0 ? getMonthName(str(col(r, blnIdx))) : "",
+                    bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
                     barang: str(col(r, brgIdx)),
                     qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
                     satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
@@ -1625,7 +1657,7 @@
                 .map((r) => ({
                   dist: distName,
                   cust: str(col(r, custIdx)),
-                  bulan: blnIdx >= 0 ? getMonthName(str(col(r, blnIdx))) : "",
+                  bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
                   barang: str(col(r, brgIdx)),
                   qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
                   satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
@@ -1696,7 +1728,7 @@
               cellDates: true,
               raw: true,
             });
-            const rows = detectAndExtract(wb, shortName);
+            const rows = detectAndExtractWithNorm(wb, shortName);
             if (rows.length === 0) {
               log(`⚠ ${shortName}: tidak ada data yang bisa dibaca`, "err");
               errors.push({
@@ -1720,6 +1752,12 @@
         if (cancelled) return;
         setProgress(100, "Selesai!");
         showResults(xlsxFiles.length);
+
+        // Show matcher FAB after processing
+        $("matcher-fab").classList.remove("hidden");
+        bulanNormStats = {};
+        buildMatcherResults();
+        updateFabBadge();
       }
 
       function showResults(total) {
@@ -2148,9 +2186,575 @@
         $("sel-target-month").value = "";
         setPeriodMode("auto");
         cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
+        bulanNormStats = {};
+        matcherResults = {};
+        custOverrides = {};
+        matcherCurrentDist = null;
+        tplROCustomers = [];
+        $("matcher-fab").classList.add("hidden");
         setStep(1);
         showSection("upload");
       });
+
+      // ════════════════════════════════════════════════════════════
+      //  BULAN NORMALIZATION — fixes MJAP (English) & UD Sejahtera (Jan 2026)
+      // ════════════════════════════════════════════════════════════
+      const MONTH_EN = [
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+      ];
+      const MONTH_EN_SHORT = [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+      ];
+
+      /**
+       * Normalize any bulan string to standard Bahasa Indonesia month name.
+       * Handles: "January", "Jan 2026", "January 2026", "Jan", "Januari", "01", etc.
+       */
+      function normalizeBulan(raw) {
+        if (!raw) return "";
+        const s = String(raw).trim().toLowerCase();
+        // Already a full BI month name?
+        const biIdx = MONTH_NAMES.findIndex((m) => m.toLowerCase() === s);
+        if (biIdx >= 0) return MONTH_NAMES[biIdx];
+        // BI short?
+        const biShortIdx = MONTH_SHORT.findIndex((m) => m.toLowerCase() === s);
+        if (biShortIdx >= 0) return MONTH_NAMES[biShortIdx];
+        // English full name (MJAP format: "January")
+        const enIdx = MONTH_EN.indexOf(s);
+        if (enIdx >= 0) return MONTH_NAMES[enIdx];
+        // English short (may include year: "Jan 2026")
+        const firstWord = s.split(/[\s,\/\-]/)[0];
+        const enShortIdx = MONTH_EN_SHORT.indexOf(firstWord);
+        if (enShortIdx >= 0) return MONTH_NAMES[enShortIdx];
+        // BI short embedded: "Des 2025" → firstWord "des" matches short
+        const biShortEmbedIdx = MONTH_SHORT.findIndex(
+          (m) => m.toLowerCase() === firstWord,
+        );
+        if (biShortEmbedIdx >= 0) return MONTH_NAMES[biShortEmbedIdx];
+        // Numeric month: "01" → "Januari"
+        if (/^\d{1,2}$/.test(s)) {
+          const n = parseInt(s);
+          if (n >= 1 && n <= 12) return MONTH_NAMES[n - 1];
+        }
+        // Fallback: return original (preserve if unrecognized)
+        return raw.trim();
+      }
+
+      // Track how many rows were normalized per distributor
+      let bulanNormStats = {}; // { distName: { original: count, normalized: { "January": "Januari" } } }
+
+      // Wrap detectAndExtract to normalize bulan on every extracted row
+      const _origDetectAndExtract = detectAndExtract;
+      function detectAndExtractWithNorm(wb, fileName) {
+        const rows = _origDetectAndExtract(wb, fileName);
+        const distName = fileName
+          .replace(/\.xlsx$/i, "")
+          .replace(/^.*[\\\/]/, "");
+        const normMap = {};
+        rows.forEach((row) => {
+          const orig = row.bulan;
+          const normed = normalizeBulan(orig);
+          if (orig !== normed) {
+            normMap[orig] = normed;
+          }
+          row.bulan = normed;
+          row._bulanOrig = orig; // keep original for reporting
+        });
+        if (Object.keys(normMap).length > 0) {
+          bulanNormStats[distName] = normMap;
+        }
+        return rows;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  FUZZY MATCHING ENGINE (migrated from stock_name_matcher)
+      // ════════════════════════════════════════════════════════════
+      const CUST_STOP = {
+        cv: 1,
+        pt: 1,
+        ud: 1,
+        tb: 1,
+        toko: 1,
+        toko: 1,
+        bpk: 1,
+        ibu: 1,
+        and: 1,
+        dan: 1,
+      };
+
+      function normCust(s) {
+        return s
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      function tokenizeCust(s) {
+        return s.split(/\s+/).filter((w) => w.length > 1 && !CUST_STOP[w]);
+      }
+      function jaccardCust(a, b) {
+        if (!a.length && !b.length) return 1;
+        if (!a.length || !b.length) return 0;
+        const sa = {},
+          sb = {};
+        let inter = 0;
+        a.forEach((t) => (sa[t] = 1));
+        b.forEach((t) => (sb[t] = 1));
+        Object.keys(sa).forEach((t) => {
+          if (sb[t]) inter++;
+        });
+        return (
+          inter / (Object.keys(sa).length + Object.keys(sb).length - inter)
+        );
+      }
+      function bigramCust(a, b) {
+        function bg(s) {
+          const r = {};
+          for (let i = 0; i < s.length - 1; i++) {
+            const k = s[i] + s[i + 1];
+            r[k] = (r[k] || 0) + 1;
+          }
+          return r;
+        }
+        const ba = bg(a),
+          bb = bg(b);
+        let inter = 0,
+          tA = 0,
+          tB = 0;
+        Object.keys(ba).forEach((k) => {
+          tA += ba[k];
+          if (bb[k]) inter += Math.min(ba[k], bb[k]);
+        });
+        Object.keys(bb).forEach((k) => {
+          tB += bb[k];
+        });
+        const d = tA + tB - inter;
+        return d > 0 ? inter / d : 0;
+      }
+      function levenshteinCust(a, b) {
+        a = a.substring(0, 80);
+        b = b.substring(0, 80);
+        const la = a.length,
+          lb = b.length;
+        if (!la) return !lb ? 1 : 0;
+        if (!lb) return 0;
+        let prev = [],
+          curr = [];
+        for (let j = 0; j <= lb; j++) prev[j] = j;
+        for (let i = 1; i <= la; i++) {
+          curr[0] = i;
+          for (let j = 1; j <= lb; j++) {
+            const c = a[i - 1] === b[j - 1] ? 0 : 1;
+            curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + c);
+          }
+          prev = curr.slice();
+        }
+        return 1 - prev[lb] / Math.max(la, lb);
+      }
+      function scoreCust(na, nb) {
+        const ta = tokenizeCust(na),
+          tb = tokenizeCust(nb);
+        return (
+          jaccardCust(ta, tb) * 0.45 +
+          bigramCust(na, nb) * 0.2 +
+          (ta.length && tb.length
+            ? ta.filter((w) => tb.includes(w)).length /
+              Math.min(ta.length, tb.length)
+            : 0) *
+            0.2 +
+          levenshteinCust(na, nb) * 0.15
+        );
+      }
+      function findBestCustMatch(custName, candidates) {
+        const na = normCust(custName);
+        let best = null,
+          bestScore = 0;
+        candidates.forEach((c) => {
+          const nb = normCust(c);
+          const s = scoreCust(na, nb);
+          if (s > bestScore) {
+            bestScore = s;
+            best = c;
+          }
+        });
+        if (bestScore < 0.18) return null;
+        return { name: best, score: Math.round(bestScore * 100) };
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  MATCHER STATE & UI
+      // ════════════════════════════════════════════════════════════
+      let matcherResults = {}; // { distName: [{dbCust, roCust, score, override}] }
+      let matcherCurrentDist = null;
+      let custOverrides = {}; // { distName: { dbCust: correctedName } }
+      let activeMTab = "bulan";
+
+      function openMatcher() {
+        $("matcher-overlay").classList.remove("hidden");
+        renderBulanReport();
+        renderMatcherDistGrid();
+        if (matcherCurrentDist) renderMatcherTable(matcherCurrentDist);
+      }
+      function closeMatcher() {
+        $("matcher-overlay").classList.add("hidden");
+      }
+      function switchMTab(tab) {
+        activeMTab = tab;
+        ["bulan", "cust"].forEach((t) => {
+          $("mtab-" + t).classList.toggle("active", t === tab);
+          $("mtab-content-" + t).classList.toggle("active", t === tab);
+        });
+        if (tab === "cust") {
+          $("btn-apply-matches").style.display = "inline-flex";
+          renderMatcherDistGrid();
+        } else {
+          $("btn-apply-matches").style.display = "none";
+          renderBulanReport();
+        }
+      }
+
+      // ── Bulan normalization report ──
+      function renderBulanReport() {
+        const el = $("bulan-norm-report");
+        const dists = Object.keys(bulanNormStats);
+        if (dists.length === 0) {
+          el.innerHTML =
+            '<div class="alert alert-info"><i class="ti ti-circle-check"></i><span>Semua data bulan sudah dalam format standar. Tidak ada normalisasi yang diperlukan.</span></div>';
+          return;
+        }
+        let html = "";
+        dists.forEach((dist) => {
+          const map = bulanNormStats[dist];
+          const entries = Object.entries(map);
+          html += `<div class="bulan-alert">
+            <i class="ti ti-alert-triangle" style="flex-shrink:0; margin-top:1px"></i>
+            <div style="flex:1">
+              <strong>${dist}</strong> — ${entries.length} format bulan berbeda ditemukan dan dinormalisasi otomatis:
+              <table class="norm-table">
+                <tr><td style="color:var(--text2); font-weight:400">Format Asli (dalam DB)</td><td>Format Standar (setelah normalisasi)</td></tr>
+                ${entries.map(([orig, normed]) => `<tr><td>${esc(orig)}</td><td>→ ${esc(normed)}</td></tr>`).join("")}
+              </table>
+            </div>
+          </div>`;
+        });
+        el.innerHTML = html;
+      }
+
+      // ── Customer fuzzy match per distributor ──
+      function buildMatcherResults() {
+        if (!tplActive || !tplDistOrder.length) return;
+        // Get RO customer list from template (Sheet1 parse — we already have tplDistOrder, but need customers)
+        // Actually: we match DB customers vs RO customer list extracted from the template's data sheet
+        // For now: match DB customers vs all other DB customers across all distributions (deduped) —
+        // but better: match vs template's existing customer names if available, else vs all DB custs
+        const allDbCusts = new Set();
+        resultData.forEach((r) => {
+          if (r.cust) allDbCusts.add(r.cust);
+        });
+        const roCusts =
+          tplROCustomers.length > 0 ? tplROCustomers : Array.from(allDbCusts);
+
+        // Group DB customers by distributor
+        const dbCustsByDist = {};
+        resultData.forEach((r) => {
+          if (!r.dist || !r.cust) return;
+          if (!dbCustsByDist[r.dist]) dbCustsByDist[r.dist] = new Set();
+          dbCustsByDist[r.dist].add(r.cust);
+        });
+
+        matcherResults = {};
+        Object.entries(dbCustsByDist).forEach(([dist, custSet]) => {
+          const rows = [];
+          custSet.forEach((dbCust) => {
+            const m = findBestCustMatch(
+              dbCust,
+              roCusts.filter((c) => c !== dbCust),
+            );
+            // Exact match — skip (confidence 100%)
+            const exactInRo = roCusts.includes(dbCust);
+            if (exactInRo) {
+              rows.push({ dbCust, roCust: dbCust, score: 100, exact: true });
+            } else if (m) {
+              rows.push({
+                dbCust,
+                roCust: m.name,
+                score: m.score,
+                exact: false,
+              });
+            } else {
+              rows.push({ dbCust, roCust: null, score: 0, exact: false });
+            }
+          });
+          rows.sort((a, b) => a.score - b.score); // low confidence first
+          matcherResults[dist] = rows;
+        });
+      }
+
+      // RO customers extracted from template file (Sheet1 content or data sheet customers)
+      let tplROCustomers = [];
+
+      function renderMatcherDistGrid() {
+        buildMatcherResults();
+        const el = $("matcher-dist-grid");
+        const dists = Object.keys(matcherResults);
+        if (dists.length === 0) {
+          el.innerHTML =
+            '<div style="font-size:13px; color:var(--text3)">Data belum diproses atau tidak ada distributor.</div>';
+          return;
+        }
+        el.innerHTML = dists
+          .map((dist) => {
+            const rows = matcherResults[dist] || [];
+            const lowConf = rows.filter((r) => !r.exact && r.score < 70).length;
+            const isOk = lowConf === 0;
+            const active = dist === matcherCurrentDist ? " active" : "";
+            const okCls = isOk ? " ok" : "";
+            return `<button class="mdist-btn${active}${okCls}" onclick="selectMatcherDist('${esc(dist)}')">${esc(dist)}<span class="mdist-badge">${lowConf > 0 ? lowConf + " ⚠" : "✓"}</span></button>`;
+          })
+          .join("");
+
+        if (!matcherCurrentDist && dists.length > 0)
+          selectMatcherDist(dists[0]);
+      }
+
+      function selectMatcherDist(dist) {
+        matcherCurrentDist = dist;
+        renderMatcherDistGrid();
+        renderMatcherTable(dist);
+      }
+
+      function renderMatcherTable(dist) {
+        const rows = matcherResults[dist] || [];
+        const wrap = $("matcher-table-wrap");
+        if (!rows.length) {
+          wrap.innerHTML =
+            '<div style="font-size:13px;color:var(--text3);text-align:center;padding:1.5rem 0">Tidak ada customer untuk distributor ini.</div>';
+          return;
+        }
+        const allDbCusts = new Set(resultData.map((r) => r.cust));
+        const roCusts =
+          tplROCustomers.length > 0 ? tplROCustomers : Array.from(allDbCusts);
+
+        const overrides = custOverrides[dist] || {};
+        const lowCount = rows.filter((r) => !r.exact && r.score < 70).length;
+        $("matcher-status").textContent =
+          `${dist} — ${rows.length} customer, ${lowCount} perlu review`;
+
+        let html = `<div class="match-tbl-wrap"><table class="mtbl">
+          <thead><tr>
+            <th>#</th>
+            <th>Nama Customer (DB)</th>
+            <th>Confidence</th>
+            <th>Best Match (Template / DB lain)</th>
+            <th>Override Manual</th>
+          </tr></thead><tbody>`;
+
+        rows.forEach((r, i) => {
+          const override = overrides[r.dbCust];
+          const confPct = r.score;
+          const confCls = confPct >= 80 ? "" : confPct >= 50 ? "med" : "low";
+          const pillCls = r.exact
+            ? "sp-matched"
+            : confPct >= 80
+              ? "sp-matched"
+              : confPct >= 50
+                ? "sp-med"
+                : "sp-low";
+          const barW = Math.max(confPct, 4);
+
+          const matchDisplay = r.exact
+            ? `<span class="ro-cust-badge sp-matched" title="Nama persis sama">= Exact Match</span>`
+            : r.roCust
+              ? `<span class="ro-cust-badge ${pillCls}" title="${esc(r.roCust)}">${esc(r.roCust.length > 28 ? r.roCust.slice(0, 28) + "…" : r.roCust)}</span>`
+              : `<span class="ro-cust-badge sp-low">— tidak ada kandidat —</span>`;
+
+          // Build select options
+          const opts = ["— Gunakan nama DB asli —", ...roCusts]
+            .map(
+              (c) =>
+                `<option value="${esc(c)}" ${override === c || (!override && c === r.roCust && !r.exact) ? "selected" : ""}>${esc(c)}</option>`,
+            )
+            .join("");
+          const selChanged =
+            override && override !== r.roCust ? " changed" : "";
+
+          html += `<tr>
+            <td style="color:var(--text3);width:32px">${i + 1}</td>
+            <td class="sku-cell">${esc(r.dbCust)}</td>
+            <td style="min-width:120px">
+              ${
+                r.exact
+                  ? '<span style="font-size:12px;color:var(--green);font-weight:500">100% exact</span>'
+                  : `
+              <div class="conf-bar">
+                <div class="conf-fill ${confCls}" style="width:${barW}px; min-width:4px; max-width:80px"></div>
+                <span class="conf-pct">${confPct}%</span>
+              </div>`
+              }
+            </td>
+            <td>${matchDisplay}</td>
+            <td>
+              ${
+                r.exact
+                  ? '<span style="font-size:12px;color:var(--text3)">—</span>'
+                  : `<select class="match-sel${selChanged}" data-dist="${esc(dist)}" data-cust="${esc(r.dbCust)}" onchange="onMatchOverride(this)">${opts}</select>`
+              }
+            </td>
+          </tr>`;
+        });
+        html += "</tbody></table></div>";
+        wrap.innerHTML = html;
+      }
+
+      function onMatchOverride(sel) {
+        const dist = sel.dataset.dist;
+        const cust = sel.dataset.cust;
+        const val = sel.value;
+        if (!custOverrides[dist]) custOverrides[dist] = {};
+        if (val === "— Gunakan nama DB asli —") {
+          delete custOverrides[dist][cust];
+        } else {
+          custOverrides[dist][cust] = val;
+        }
+        sel.classList.toggle("changed", !!custOverrides[dist][cust]);
+        updateFabBadge();
+      }
+
+      function applyMatchOverrides() {
+        let applied = 0;
+        resultData.forEach((row) => {
+          const distOverrides = custOverrides[row.dist];
+          if (distOverrides && distOverrides[row.cust]) {
+            row.cust = distOverrides[row.cust];
+            applied++;
+          }
+        });
+        // Clear overrides after apply
+        custOverrides = {};
+        matcherResults = {};
+        matcherCurrentDist = null;
+        buildMatcherResults();
+        renderMatcherDistGrid();
+        alert(`✓ ${applied} baris berhasil dikoreksi nama customernya.`);
+        $("matcher-status").textContent = `${applied} baris dikoreksi.`;
+        updateFabBadge();
+      }
+
+      function updateFabBadge() {
+        const totalPending = Object.values(custOverrides).reduce(
+          (s, d) => s + Object.keys(d).length,
+          0,
+        );
+        const totalLowConf = Object.values(matcherResults).reduce(
+          (s, rows) => s + rows.filter((r) => !r.exact && r.score < 70).length,
+          0,
+        );
+        const badge = $("matcher-fab-badge");
+        const n = totalLowConf + totalPending;
+        badge.textContent = n > 0 ? n : "✓";
+        badge.style.background = n > 0 ? "" : "var(--green-bg)";
+        badge.style.color = n > 0 ? "" : "var(--green)";
+      }
+
+      function esc(s) {
+        return String(s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  HOOK INTO PROCESSING — show FAB after process completes
+      //  And extract RO customers from template if available
+      // ════════════════════════════════════════════════════════════
+      const _origHandleTplFile = handleTplFile;
+      async function handleTplFile(f) {
+        await _origHandleTplFile(f);
+        // After template is loaded, extract customer names from data sheets
+        try {
+          const ab = await f.arrayBuffer();
+          const wb = XLSX.read(ab, { type: "array", raw: true });
+          const custs = new Set();
+          for (const sn of wb.SheetNames) {
+            if (sn === "Sheet1") continue;
+            const ws = wb.Sheets[sn];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            // Find NAMA CUSTOMER column
+            const hdr = (data[0] || []).map((v) =>
+              String(v || "").toUpperCase(),
+            );
+            const custIdx = hdr.findIndex(
+              (h) => h.includes("CUSTOMER") || h.includes("PELANGGAN"),
+            );
+            if (custIdx >= 0) {
+              data.slice(1).forEach((row) => {
+                const v = row[custIdx];
+                if (
+                  v &&
+                  typeof v === "string" &&
+                  v.trim() &&
+                  !v.toUpperCase().startsWith("TOTAL")
+                ) {
+                  custs.add(v.trim());
+                }
+              });
+            }
+          }
+          // Also from Sheet1 customer list
+          if (wb.SheetNames.includes("Sheet1")) {
+            const ws = wb.Sheets["Sheet1"];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            data.forEach((row) => {
+              (row || []).forEach((v) => {
+                if (
+                  v &&
+                  typeof v === "string" &&
+                  v.trim().length > 2 &&
+                  !v.toUpperCase().startsWith("TOTAL") &&
+                  !v.toUpperCase().includes("DISTRIBUTOR") &&
+                  !v.toUpperCase().includes("REGION")
+                ) {
+                  // heuristic: likely a customer name if it has spaces or specific patterns
+                }
+              });
+            });
+          }
+          tplROCustomers = Array.from(custs);
+        } catch (e) {
+          tplROCustomers = [];
+        }
+      }
     </script>
   </body>
 </html>
