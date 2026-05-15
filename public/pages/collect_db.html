@@ -1,674 +1,1123 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Collect DB — Merger Tool</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<link rel="stylesheet" href="/public/assets/css/style_collect_db.css">
-</head>
-<body>
-<div class="app">
-<div class="app-header">
-    <h1><i class="ti ti-database" aria-hidden="true" style="font-size:20px;vertical-align:-2px;margin-right:6px"></i>Collect DB — Merger Tool</h1>
-    <p>Upload file .zip berisi data distributor, atur kolom, lalu export ke Excel</p>
-  </div>
-
-  <!-- Steps -->
-  <div class="steps">
-    <div class="step active" id="step-1">
-      <div class="step-num">1</div><span>Upload ZIP</span>
-    </div>
-    <div class="step" id="step-2">
-      <div class="step-num">2</div><span>Atur Kolom</span>
-    </div>
-    <div class="step" id="step-3">
-      <div class="step-num">3</div><span>Proses</span>
-    </div>
-    <div class="step" id="step-4">
-      <div class="step-num">4</div><span>Export</span>
-    </div>
-  </div>
-
-  <!-- SECTION 1: Upload -->
-  <div id="sec-upload" class="section">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-upload" aria-hidden="true"></i>Upload File ZIP</div>
-      <div class="card-sub">File ZIP harus berisi kumpulan file .xlsx dari masing-masing distributor</div>
-
-      <div class="alert alert-info">
-        <i class="ti ti-info-circle"></i>
-        <span>Data diproses langsung di browser. Tidak ada file yang dikirim ke server.</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collect DB — Merger Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+    />
+    <link rel="stylesheet" href="/public/assets/css/style_collect_db.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="app-header">
+        <h1>
+          <i
+            class="ti ti-database"
+            aria-hidden="true"
+            style="font-size: 20px; vertical-align: -2px; margin-right: 6px"
+          ></i
+          >Collect DB — Merger Tool
+        </h1>
+        <p>
+          Upload file .zip berisi data distributor, atur kolom, lalu export ke
+          Excel
+        </p>
       </div>
 
-      <div class="drop-zone" id="drop-zone">
-        <i class="ti ti-file-zip" aria-hidden="true"></i>
-        <p><strong onclick="document.getElementById('file-input').click()">Klik untuk pilih file</strong> atau seret & lepas di sini</p>
-        <p style="font-size:12px;color:var(--text3);margin-top:6px">Format: .zip &nbsp;·&nbsp; Maks. 200 MB</p>
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step active" id="step-1">
+          <div class="step-num">1</div>
+          <span>Upload ZIP</span>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-num">2</div>
+          <span>Atur Kolom</span>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-num">3</div>
+          <span>Proses</span>
+        </div>
+        <div class="step" id="step-4">
+          <div class="step-num">4</div>
+          <span>Export</span>
+        </div>
       </div>
-      <input type="file" id="file-input" accept=".zip">
 
-      <div id="file-selected" class="hidden">
-        <div class="file-info">
-          <i class="ti ti-file-zip"></i>
-          <div>
-            <div class="file-info-name" id="file-name">-</div>
-            <div class="file-info-size" id="file-size">-</div>
+      <!-- SECTION 1: Upload -->
+      <div id="sec-upload" class="section">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-upload" aria-hidden="true"></i>Upload File ZIP
           </div>
-          <button class="file-info-remove" id="btn-remove-file" title="Hapus file"><i class="ti ti-x"></i></button>
-        </div>
-        <div id="zip-preview" style="margin-top:.75rem;font-size:13px;color:var(--text2)"></div>
-      </div>
+          <div class="card-sub">
+            File ZIP harus berisi kumpulan file .xlsx dari masing-masing
+            distributor
+          </div>
 
-      <div class="btn-row">
-        <button class="btn btn-primary" id="btn-next-1" disabled>
-          Lanjut ke Atur Kolom <i class="ti ti-arrow-right"></i>
-        </button>
-      </div>
-    </div>
-  </div>
+          <div class="alert alert-info">
+            <i class="ti ti-info-circle"></i>
+            <span
+              >Data diproses langsung di browser. Tidak ada file yang dikirim ke
+              server.</span
+            >
+          </div>
 
-  <!-- SECTION 2: Column config -->
-  <div id="sec-columns" class="section hidden">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-columns" aria-hidden="true"></i>Atur Urutan & Kolom</div>
-      <div class="card-sub">Seret untuk mengubah urutan. Toggle untuk menyembunyikan kolom dari hasil export.</div>
+          <div class="drop-zone" id="drop-zone">
+            <i class="ti ti-file-zip" aria-hidden="true"></i>
+            <p>
+              <strong onclick="document.getElementById('file-input').click()"
+                >Klik untuk pilih file</strong
+              >
+              atau seret & lepas di sini
+            </p>
+            <p style="font-size: 12px; color: var(--text3); margin-top: 6px">
+              Format: .zip &nbsp;·&nbsp; Maks. 200 MB
+            </p>
+          </div>
+          <input type="file" id="file-input" accept=".zip" />
 
-      <div class="reset-row">
-        <button class="reset-btn" id="btn-reset-cols"><i class="ti ti-refresh" style="font-size:13px"></i> Reset ke default</button>
-      </div>
+          <div id="file-selected" class="hidden">
+            <div class="file-info">
+              <i class="ti ti-file-zip"></i>
+              <div>
+                <div class="file-info-name" id="file-name">-</div>
+                <div class="file-info-size" id="file-size">-</div>
+              </div>
+              <button
+                class="file-info-remove"
+                id="btn-remove-file"
+                title="Hapus file"
+              >
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+            <div
+              id="zip-preview"
+              style="margin-top: 0.75rem; font-size: 13px; color: var(--text2)"
+            ></div>
+          </div>
 
-      <div class="col-list" id="col-list"></div>
-
-      <div class="btn-row">
-        <button class="btn" id="btn-back-1"><i class="ti ti-arrow-left"></i> Kembali</button>
-        <button class="btn btn-primary" id="btn-next-2">
-          Mulai Proses <i class="ti ti-arrow-right"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION 3: Processing -->
-  <div id="sec-process" class="section hidden">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-loader" aria-hidden="true"></i>Memproses Data</div>
-      <div class="card-sub" id="process-sub">Membaca file ZIP...</div>
-
-      <div class="progress-wrap">
-        <div class="progress-label">
-          <span id="prog-label">Mempersiapkan...</span>
-          <span id="prog-pct">0%</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
-      </div>
-
-      <div class="log-box" id="log-box"></div>
-
-      <div class="btn-row">
-        <button class="btn btn-danger" id="btn-cancel">
-          <i class="ti ti-x"></i> Batalkan Proses
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION 4: Export -->
-  <div id="sec-export" class="section hidden">
-    <div class="card">
-      <div class="card-title" style="color:var(--green)"><i class="ti ti-circle-check" aria-hidden="true"></i>Selesai!</div>
-      <div class="card-sub">Data berhasil digabungkan. Siap untuk di-export.</div>
-
-      <div class="summary-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total baris</div>
-          <div class="stat-value" id="stat-rows">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Distributor</div>
-          <div class="stat-value" id="stat-dist">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">File berhasil</div>
-          <div class="stat-value" id="stat-ok">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">File gagal</div>
-          <div class="stat-value" id="stat-err">-</div>
-        </div>
-      </div>
-
-      <div id="err-summary" class="hidden" style="margin-top:1rem">
-        <div class="alert alert-warning">
-          <i class="ti ti-alert-triangle"></i>
-          <div>
-            <div style="font-weight:500;margin-bottom:4px">Beberapa file tidak dapat dibaca:</div>
-            <div id="err-list" style="font-size:12px;line-height:1.8"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-next-1" disabled>
+              Lanjut ke Atur Kolom <i class="ti ti-arrow-right"></i>
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="btn-row">
-        <button class="btn btn-primary" id="btn-export">
-          <i class="ti ti-download"></i> Download Excel (.xlsx)
-        </button>
-        <button class="btn" id="btn-restart">
-          <i class="ti ti-refresh"></i> Proses File Baru
-        </button>
+      <!-- SECTION 2: Column config -->
+      <div id="sec-columns" class="section hidden">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-columns" aria-hidden="true"></i>Atur Urutan & Kolom
+          </div>
+          <div class="card-sub">
+            Seret untuk mengubah urutan. Toggle untuk menyembunyikan kolom dari
+            hasil export.
+          </div>
+
+          <div class="reset-row">
+            <button class="reset-btn" id="btn-reset-cols">
+              <i class="ti ti-refresh" style="font-size: 13px"></i> Reset ke
+              default
+            </button>
+          </div>
+
+          <div class="col-list" id="col-list"></div>
+
+          <div class="btn-row">
+            <button class="btn" id="btn-back-1">
+              <i class="ti ti-arrow-left"></i> Kembali
+            </button>
+            <button class="btn btn-primary" id="btn-next-2">
+              Mulai Proses <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Processing -->
+      <div id="sec-process" class="section hidden">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-loader" aria-hidden="true"></i>Memproses Data
+          </div>
+          <div class="card-sub" id="process-sub">Membaca file ZIP...</div>
+
+          <div class="progress-wrap">
+            <div class="progress-label">
+              <span id="prog-label">Mempersiapkan...</span>
+              <span id="prog-pct">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="prog-fill" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div class="log-box" id="log-box"></div>
+
+          <div class="btn-row">
+            <button class="btn btn-danger" id="btn-cancel">
+              <i class="ti ti-x"></i> Batalkan Proses
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: Export -->
+      <div id="sec-export" class="section hidden">
+        <div class="card">
+          <div class="card-title" style="color: var(--green)">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>Selesai!
+          </div>
+          <div class="card-sub">
+            Data berhasil digabungkan. Siap untuk di-export.
+          </div>
+
+          <div class="summary-grid">
+            <div class="stat-card">
+              <div class="stat-label">Total baris</div>
+              <div class="stat-value" id="stat-rows">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Distributor</div>
+              <div class="stat-value" id="stat-dist">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">File berhasil</div>
+              <div class="stat-value" id="stat-ok">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">File gagal</div>
+              <div class="stat-value" id="stat-err">-</div>
+            </div>
+          </div>
+
+          <div id="err-summary" class="hidden" style="margin-top: 1rem">
+            <div class="alert alert-warning">
+              <i class="ti ti-alert-triangle"></i>
+              <div>
+                <div style="font-weight: 500; margin-bottom: 4px">
+                  Beberapa file tidak dapat dibaca:
+                </div>
+                <div
+                  id="err-list"
+                  style="font-size: 12px; line-height: 1.8"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-export">
+              <i class="ti ti-download"></i> Download Excel (.xlsx)
+            </button>
+            <button class="btn" id="btn-restart">
+              <i class="ti ti-refresh"></i> Proses File Baru
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-</div>
+    <script>
+      const COLS_DEFAULT = [
+        { id: "dist", label: "Nama Distributor", enabled: true },
+        { id: "cust", label: "Nama Customer", enabled: true },
+        { id: "bulan", label: "Bulan", enabled: true },
+        { id: "barang", label: "Nama Barang", enabled: true },
+        { id: "qty", label: "QTY", enabled: true },
+        { id: "satuan", label: "Satuan", enabled: true },
+        { id: "jumlah", label: "Jumlah", enabled: true },
+      ];
 
-<script>
-const COLS_DEFAULT = [
-  {id:'dist',   label:'Nama Distributor', enabled:true},
-  {id:'cust',   label:'Nama Customer',    enabled:true},
-  {id:'bulan',  label:'Bulan',            enabled:true},
-  {id:'barang', label:'Nama Barang',      enabled:true},
-  {id:'qty',    label:'QTY',              enabled:true},
-  {id:'satuan', label:'Satuan',           enabled:true},
-  {id:'jumlah', label:'Jumlah',           enabled:true},
-];
+      let cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
+      let zipFile = null;
+      let resultData = [];
+      let cancelled = false;
+      let errors = [];
 
-let cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
-let zipFile = null;
-let resultData = [];
-let cancelled = false;
-let errors = [];
+      const $ = (id) => document.getElementById(id);
 
-const $ = id => document.getElementById(id);
+      function showSection(name) {
+        ["upload", "columns", "process", "export"].forEach((s) => {
+          $("sec-" + s).classList.toggle("hidden", s !== name);
+        });
+      }
 
-function showSection(name) {
-  ['upload','columns','process','export'].forEach(s => {
-    $('sec-'+s).classList.toggle('hidden', s !== name);
-  });
-}
+      function setStep(n) {
+        for (let i = 1; i <= 4; i++) {
+          const el = $("step-" + i);
+          el.classList.remove("active", "done");
+          if (i < n) el.classList.add("done");
+          if (i === n) el.classList.add("active");
+          if (el.querySelector(".step-num") && i < n)
+            el.querySelector(".step-num").innerHTML =
+              '<i class="ti ti-check" style="font-size:12px"></i>';
+        }
+      }
 
-function setStep(n) {
-  for(let i=1;i<=4;i++){
-    const el = $('step-'+i);
-    el.classList.remove('active','done');
-    if(i < n) el.classList.add('done');
-    if(i === n) el.classList.add('active');
-    if(el.querySelector('.step-num') && i < n)
-      el.querySelector('.step-num').innerHTML = '<i class="ti ti-check" style="font-size:12px"></i>';
-  }
-}
+      function formatSize(bytes) {
+        if (bytes > 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+        return (bytes / 1024).toFixed(0) + " KB";
+      }
 
-function formatSize(bytes){
-  if(bytes > 1048576) return (bytes/1048576).toFixed(1)+' MB';
-  return (bytes/1024).toFixed(0)+' KB';
-}
+      function log(msg, type = "") {
+        const box = $("log-box");
+        const d = document.createElement("div");
+        d.className = "log-entry " + (type || "");
+        d.textContent = msg;
+        box.appendChild(d);
+        box.scrollTop = box.scrollHeight;
+      }
 
-function log(msg, type=''){
-  const box = $('log-box');
-  const d = document.createElement('div');
-  d.className = 'log-entry '+(type||'');
-  d.textContent = msg;
-  box.appendChild(d);
-  box.scrollTop = box.scrollHeight;
-}
+      function setProgress(pct, label) {
+        $("prog-fill").style.width = pct + "%";
+        $("prog-pct").textContent = Math.round(pct) + "%";
+        if (label) $("prog-label").textContent = label;
+      }
 
-function setProgress(pct, label){
-  $('prog-fill').style.width = pct+'%';
-  $('prog-pct').textContent = Math.round(pct)+'%';
-  if(label) $('prog-label').textContent = label;
-}
+      // ─── Drop zone ────────────────────────────────────────────────────
+      const dropZone = $("drop-zone");
+      dropZone.addEventListener("click", () => $("file-input").click());
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+      });
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("drag-over"),
+      );
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        const f = e.dataTransfer.files[0];
+        if (f) handleFile(f);
+      });
+      $("file-input").addEventListener("change", (e) => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+      });
 
-// ─── Drop zone ────────────────────────────────────────────────────
-const dropZone = $('drop-zone');
-dropZone.addEventListener('click', () => $('file-input').click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if(f) handleFile(f);
-});
-$('file-input').addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+      async function handleFile(f) {
+        if (!f.name.toLowerCase().endsWith(".zip")) {
+          alert("Hanya file .zip yang diterima.");
+          return;
+        }
+        zipFile = f;
+        $("file-name").textContent = f.name;
+        $("file-size").textContent = formatSize(f.size);
+        $("file-selected").classList.remove("hidden");
+        dropZone.classList.add("hidden");
 
-async function handleFile(f){
-  if(!f.name.toLowerCase().endsWith('.zip')){ alert('Hanya file .zip yang diterima.'); return; }
-  zipFile = f;
-  $('file-name').textContent = f.name;
-  $('file-size').textContent = formatSize(f.size);
-  $('file-selected').classList.remove('hidden');
-  dropZone.classList.add('hidden');
+        try {
+          const zip = await JSZip.loadAsync(f);
+          const xlsxFiles = Object.keys(zip.files).filter(
+            (n) =>
+              n.match(/\.xlsx$/i) && !zip.files[n].dir && !n.includes("~$"),
+          );
+          $("zip-preview").textContent =
+            `Ditemukan ${xlsxFiles.length} file .xlsx di dalam ZIP`;
+          $("btn-next-1").disabled = xlsxFiles.length === 0;
+        } catch (e) {
+          $("zip-preview").textContent =
+            "Tidak dapat membaca ZIP: " + e.message;
+        }
+      }
 
-  try{
-    const zip = await JSZip.loadAsync(f);
-    const xlsxFiles = Object.keys(zip.files).filter(n => n.match(/\.xlsx$/i) && !zip.files[n].dir && !n.includes('~$'));
-    $('zip-preview').textContent = `Ditemukan ${xlsxFiles.length} file .xlsx di dalam ZIP`;
-    $('btn-next-1').disabled = xlsxFiles.length === 0;
-  } catch(e){
-    $('zip-preview').textContent = 'Tidak dapat membaca ZIP: '+e.message;
-  }
-}
+      $("btn-remove-file").addEventListener("click", () => {
+        zipFile = null;
+        $("file-selected").classList.add("hidden");
+        dropZone.classList.remove("hidden");
+        $("file-input").value = "";
+        $("btn-next-1").disabled = true;
+      });
 
-$('btn-remove-file').addEventListener('click', () => {
-  zipFile = null;
-  $('file-selected').classList.add('hidden');
-  dropZone.classList.remove('hidden');
-  $('file-input').value = '';
-  $('btn-next-1').disabled = true;
-});
+      $("btn-next-1").addEventListener("click", () => {
+        setStep(2);
+        showSection("columns");
+        renderCols();
+      });
 
-$('btn-next-1').addEventListener('click', () => {
-  setStep(2); showSection('columns'); renderCols();
-});
-
-// ─── Column config ─────────────────────────────────────────────────
-function renderCols(){
-  const list = $('col-list');
-  list.innerHTML = '';
-  cols.forEach((col, idx) => {
-    const item = document.createElement('div');
-    item.className = 'col-item';
-    item.draggable = true;
-    item.dataset.idx = idx;
-    item.innerHTML = `
+      // ─── Column config ─────────────────────────────────────────────────
+      function renderCols() {
+        const list = $("col-list");
+        list.innerHTML = "";
+        cols.forEach((col, idx) => {
+          const item = document.createElement("div");
+          item.className = "col-item";
+          item.draggable = true;
+          item.dataset.idx = idx;
+          item.innerHTML = `
       <i class="ti ti-grip-vertical col-handle" aria-hidden="true"></i>
-      <div class="col-badge">${idx+1}</div>
+      <div class="col-badge">${idx + 1}</div>
       <span class="col-name">${col.label}</span>
-      <label class="col-toggle" title="${col.enabled?'Sembunyikan':'Tampilkan'}">
-        <input type="checkbox" ${col.enabled?'checked':''} data-idx="${idx}">
+      <label class="col-toggle" title="${col.enabled ? "Sembunyikan" : "Tampilkan"}">
+        <input type="checkbox" ${col.enabled ? "checked" : ""} data-idx="${idx}">
         <span class="toggle-track"></span>
       </label>`;
-    item.querySelector('input').addEventListener('change', e => {
-      cols[e.target.dataset.idx].enabled = e.target.checked;
-    });
-    addDragHandlers(item);
-    list.appendChild(item);
-  });
-}
-
-let dragSrc = null;
-function addDragHandlers(item){
-  item.addEventListener('dragstart', e => {
-    dragSrc = item;
-    setTimeout(() => item.classList.add('dragging'), 0);
-    e.dataTransfer.effectAllowed = 'move';
-  });
-  item.addEventListener('dragend', () => { item.classList.remove('dragging'); dragSrc=null; });
-  item.addEventListener('dragover', e => { e.preventDefault(); if(dragSrc && dragSrc!==item) item.classList.add('drag-target'); });
-  item.addEventListener('dragleave', () => item.classList.remove('drag-target'));
-  item.addEventListener('drop', e => {
-    e.preventDefault();
-    item.classList.remove('drag-target');
-    if(!dragSrc || dragSrc===item) return;
-    const a = parseInt(dragSrc.dataset.idx), b = parseInt(item.dataset.idx);
-    const tmp = cols[a]; cols[a]=cols[b]; cols[b]=tmp;
-    renderCols();
-  });
-}
-
-$('btn-reset-cols').addEventListener('click', () => {
-  cols = JSON.parse(JSON.stringify(COLS_DEFAULT)); renderCols();
-});
-$('btn-back-1').addEventListener('click', () => { setStep(1); showSection('upload'); });
-$('btn-next-2').addEventListener('click', () => {
-  if(cols.filter(c=>c.enabled).length === 0){ alert('Minimal 1 kolom harus aktif.'); return; }
-  setStep(3); showSection('process'); startProcessing();
-});
-
-// ─── Processing ────────────────────────────────────────────────────
-function getMonthName(v){
-  const months=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  if(v instanceof Date) return months[v.getMonth()]||'';
-  if(typeof v==='number' && v>=1 && v<=12) return months[v-1];
-  if(typeof v==='string'){
-    const t=v.trim();
-    if(/^\d+$/.test(t)) return months[parseInt(t)-1]||t;
-    return t;
-  }
-  return v||'';
-}
-
-function xlsxDateToJS(serial){
-  if(serial instanceof Date) return serial;
-  if(typeof serial==='number'){
-    const d = new Date(Math.round((serial-25569)*86400*1000));
-    return d;
-  }
-  return null;
-}
-
-function detectAndExtract(wb, fileName){
-  const distName = fileName.replace(/\.xlsx$/i,'').replace(/^.*[\\/]/,'');
-  let rows = [];
-
-  const trySheet = (sheetName, extractor) => {
-    if(!wb.SheetNames.includes(sheetName)) return false;
-    try {
-      const ws = wb.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-      if(data.length < 2) return false;
-      rows = extractor(data, distName);
-      return rows.length > 0;
-    } catch(e){ return false; }
-  };
-
-  const col = (row, idx) => (idx < row.length ? row[idx] : null);
-  const str = v => v==null?'':String(v).trim();
-
-  // Try "Rincian Penjualan per Barang" (Aldi, SAJ format variant)
-  if(wb.SheetNames.includes('Rincian Penjualan per Barang')){
-    const ws = wb.Sheets['Rincian Penjualan per Barang'];
-    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-    if(data.length > 1){
-      const hdr = data[0]||[];
-      // SAJ: Cabang(0),Salesman(1),ID(2),Tanggal(3),Bulan(4),Nama Pelanggan(5),Nama Barang(6),Kuantitas(7),Satuan(8),@Harga(9),Penjualan(10)
-      // Aldi: Nomor(0),Tanggal(1),Bulan(2),No(3),Nama Pelanggan(4),Alamat(5),Penjual(6),Kode(7),Nama Barang(8),Kuantitas(9),Satuan(10),@Harga(11),Jml Keluar(12),Diskon(13),Total Harga(14)
-      const isSAJ = str(hdr[0]).toLowerCase().includes('cabang');
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => {
-        if(isSAJ) return {dist:distName, cust:str(col(r,5)), bulan:getMonthName(xlsxDateToJS(col(r,3))), barang:str(col(r,6)), qty:col(r,7), satuan:str(col(r,8)), jumlah:col(r,10)};
-        else return {dist:distName, cust:str(col(r,4)), bulan:getMonthName(xlsxDateToJS(col(r,1))), barang:str(col(r,8)), qty:col(r,9), satuan:str(col(r,10)), jumlah:col(r,14)};
-      }).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-  }
-
-  // UD Sejahtera Bwi: Rincian different columns
-  if(wb.SheetNames.includes('Rincian Penjualan per Barang') && rows.length===0){
-    const ws = wb.Sheets['Rincian Penjualan per Barang'];
-    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-    rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:distName, cust:str(col(r,10)), bulan:str(col(r,9)), barang:str(col(r,3)), qty:col(r,4), satuan:str(col(r,5)), jumlah:col(r,7)
-    })).filter(r=>r.cust&&r.barang);
-    if(rows.length>0) return rows;
-  }
-
-  // Berkah Jaya: Penjualan_By_Salesman
-  for(const sn of wb.SheetNames){
-    if(sn.startsWith('Penjualan_By_Salesman')){
-      const ws = wb.Sheets[sn];
-      const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,2)), bulan:str(col(r,1)), barang:str(col(r,4)), qty:col(r,5), satuan:str(col(r,6)), jumlah:col(r,9)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-  }
-
-  // PT Panda Ibe: data sheet
-  if(trySheet('data', (data, dn) =>
-    data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:dn, cust:str(col(r,13)), bulan:getMonthName(col(r,3)), barang:str(col(r,19)), qty:col(r,23), satuan:str(col(r,22)), jumlah:col(r,30)
-    })).filter(r=>r.cust&&r.barang)
-  )) return rows;
-
-  // MJAP Tasikmalaya: Laporan_Penjualan_Format2
-  if(trySheet('Laporan_Penjualan_Format2', (data, dn) =>
-    data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:dn, cust:str(col(r,5)), bulan:str(col(r,1)), barang:str(col(r,11)), qty:col(r,14), satuan:str(col(r,15)), jumlah:col(r,17)
-    })).filter(r=>r.cust&&r.barang)
-  )) return rows;
-
-  // list-faktur-penjualan (Aquilla)
-  if(trySheet('list-faktur-penjualan', (data, dn) =>
-    data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:dn, cust:str(col(r,6)), bulan:getMonthName(xlsxDateToJS(col(r,2))), barang:str(col(r,14)), qty:col(r,17), satuan:str(col(r,18)), jumlah:col(r,20)
-    })).filter(r=>r.cust&&r.barang)
-  )) return rows;
-
-  // Page1 (Anugrah)
-  if(trySheet('Page1', (data, dn) =>
-    data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:dn, cust:str(col(r,6)), bulan:str(col(r,4)), barang:str(col(r,8)), qty:col(r,9), satuan:str(col(r,10)), jumlah:col(r,15)
-    })).filter(r=>r.cust&&r.barang)
-  )) return rows;
-
-  // Penjualan_By_Salesman variant
-  if(trySheet('Penjualan_By_Salesman_01Jan2026', (data, dn) =>
-    data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-      dist:dn, cust:str(col(r,2)), bulan:str(col(r,1)), barang:str(col(r,4)), qty:col(r,5), satuan:str(col(r,6)), jumlah:col(r,9)
-    })).filter(r=>r.cust&&r.barang)
-  )) return rows;
-
-  // DATA sheet (Ananta Tegal, Sinar Sukses, CC Jaya, Pilar, Slamet)
-  if(wb.SheetNames.includes('DATA')){
-    const ws = wb.Sheets['DATA'];
-    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-    const hdr = (data[0]||[]).map(v=>str(v).toUpperCase());
-
-    // CC Jaya Sukabumi: has NAMACUSTOMER col
-    if(hdr.some(h=>h.includes('NAMACUSTOMER'))){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,16)), bulan:getMonthName(col(r,31)), barang:str(col(r,12)), qty:col(r,37), satuan:str(col(r,74)), jumlah:col(r,47)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-    // Pilar Utama: has DISTID col
-    if(hdr[0]==='DISTID' || hdr.some(h=>h==='DISTID')){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,18)), bulan:getMonthName(xlsxDateToJS(col(r,4))), barang:str(col(r,41)), qty:col(r,78), satuan:str(col(r,77)||'KRT'), jumlah:col(r,85)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-    // Slamet: has 'Bulan Faktur'
-    if(hdr.some(h=>h.includes('BULAN FAKTUR'))){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,1)), bulan:getMonthName(col(r,4)), barang:str(col(r,10)), qty:col(r,11), satuan:str(col(r,12)), jumlah:col(r,25)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-    // Sinar Sukses: TGL,BLN,Kode,NAMA TOKO
-    if(hdr[3]==='NAMA TOKO' || hdr.some(h=>h.includes('NAMA TOKO'))){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,3)), bulan:str(col(r,1)), barang:str(col(r,4)), qty:col(r,5), satuan:str(col(r,6)), jumlah:col(r,9)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-    // Ananta Tegal/Pekalongan: Tanggal,Bulan,Nomor Nota...Nama Pelanggan
-    const qtyIdx = hdr.findIndex(h=>h==='QTY');
-    const custIdx = hdr.findIndex(h=>h.includes('NAMA PELANGGAN'));
-    const brgIdx = hdr.findIndex(h=>h==='NAMA BARANG' || h==='KODE');
-    const jmlIdx = hdr.findIndex(h=>h.includes('JUMLAH'));
-    const satIdx = hdr.findIndex(h=>h==='SAT');
-    if(custIdx>=0 && qtyIdx>=0){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,custIdx)), bulan:str(col(r,1)), barang:str(col(r,brgIdx>=0?brgIdx:5)), qty:col(r,qtyIdx), satuan:str(col(r,satIdx>=0?satIdx:qtyIdx+1)), jumlah:col(r,jmlIdx>=0?jmlIdx:qtyIdx+4)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-    // generic DATA fallback
-    if(data.length>1){
-      rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-        dist:distName, cust:str(col(r,custIdx>=0?custIdx:10)), bulan:str(col(r,1)), barang:str(col(r,5)), qty:col(r,qtyIdx>=0?qtyIdx:12), satuan:str(col(r,satIdx>=0?satIdx:13)), jumlah:col(r,jmlIdx>=0?jmlIdx:16)
-      })).filter(r=>r.cust&&r.barang);
-      if(rows.length>0) return rows;
-    }
-  }
-
-  // Laporan_Penjualan_Format2 (generic)
-  for(const sn of wb.SheetNames){
-    if(sn.toLowerCase().includes('laporan') || sn.toLowerCase().includes('penjualan')){
-      if(trySheet(sn, (data, dn) => {
-        const hdr = (data[0]||[]).map(v=>str(v).toUpperCase());
-        const custIdx = hdr.findIndex(h=>h.includes('PELANGGAN')||h.includes('CUSTOMER')||h.includes('CUST'));
-        const brgIdx = hdr.findIndex(h=>h.includes('BARANG')||h.includes('PRODUK')||h.includes('ITEM'));
-        const qtyIdx = hdr.findIndex(h=>h==='QTY'||h==='KUANTITAS'||h==='JUMLAH'&&!h.includes('RP'));
-        const blnIdx = hdr.findIndex(h=>h==='BULAN'||h==='BLN');
-        const satIdx = hdr.findIndex(h=>h==='SATUAN'||h==='SAT');
-        const jmlIdx = hdr.findIndex(h=>h==='NETO'||h==='SUBTOTAL'||h==='TOTAL HARGA'||h==='NILAI');
-        if(custIdx<0||brgIdx<0) return [];
-        return data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-          dist:dn, cust:str(col(r,custIdx)), bulan:blnIdx>=0?str(col(r,blnIdx)):'', barang:str(col(r,brgIdx)),
-          qty:qtyIdx>=0?col(r,qtyIdx):null, satuan:satIdx>=0?str(col(r,satIdx)):'', jumlah:jmlIdx>=0?col(r,jmlIdx):null
-        })).filter(r=>r.cust&&r.barang);
-      })) return rows;
-    }
-  }
-
-  // RAW sheet (Bravo Eterna)
-  for(const sn of wb.SheetNames){
-    if(sn.toUpperCase().startsWith('RAW')){
-      const ws = wb.Sheets[sn];
-      const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-      // find header row
-      let hdrIdx = data.findIndex(r => r.some(v=>str(v).toUpperCase()==='NMCUST'||str(v).toUpperCase()==='NMBRG'));
-      if(hdrIdx>=0){
-        const hdr = data[hdrIdx].map(v=>str(v).toUpperCase());
-        const custIdx=hdr.indexOf('NMCUST'), brgIdx=hdr.indexOf('NMBRG'), tglIdx=hdr.indexOf('TANGGAL');
-        const qtyIdx=hdr.indexOf('JUMLAH'), satIdx=hdr.indexOf('SAT'), jmlIdx=hdr.indexOf('TOTAL');
-        rows = data.slice(hdrIdx+1).filter(r=>r.some(v=>v!=null)).map(r => ({
-          dist:distName, cust:str(col(r,custIdx)), bulan:getMonthName(xlsxDateToJS(col(r,tglIdx>=0?tglIdx:2))),
-          barang:str(col(r,brgIdx)), qty:col(r,qtyIdx>=0?qtyIdx:11), satuan:str(col(r,satIdx>=0?satIdx:12)), jumlah:col(r,jmlIdx>=0?jmlIdx:18)
-        })).filter(r=>r.cust&&r.barang);
-        if(rows.length>0) return rows;
+          item.querySelector("input").addEventListener("change", (e) => {
+            cols[e.target.dataset.idx].enabled = e.target.checked;
+          });
+          addDragHandlers(item);
+          list.appendChild(item);
+        });
       }
-    }
-  }
 
-  // Sheet1 generic fallback
-  for(const sn of ['Sheet1','Sheet2','Cipta Anugerah Rezeki']){
-    if(wb.SheetNames.includes(sn)){
-      const ws = wb.Sheets[sn];
-      const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-      if(data.length<2) continue;
-      const hdr = (data[0]||[]).map(v=>str(v).toUpperCase());
-      const custIdx=hdr.findIndex(h=>h.includes('NAMA CUSTOMER')||h.includes('NAMA PELANGGAN')||h.includes('CUSTOMER'));
-      const brgIdx=hdr.findIndex(h=>h.includes('NAMA BARANG')||h.includes('NAMA PRODUK')||h.includes('NAMA PRODUCT'));
-      const qtyIdx=hdr.findIndex(h=>h==='QTY'||h==='KUANTITAS');
-      const blnIdx=hdr.findIndex(h=>h==='BULAN'||h==='BLN');
-      const satIdx=hdr.findIndex(h=>h==='SATUAN'||h==='SAT');
-      const jmlIdx=hdr.findIndex(h=>h.includes('NET AMOUNT')||h.includes('SUBTOTAL')||h.includes('TOTAL'));
-      if(custIdx>=0&&brgIdx>=0){
-        rows = data.slice(1).filter(r=>r.some(v=>v!=null)).map(r => ({
-          dist:distName, cust:str(col(r,custIdx)), bulan:blnIdx>=0?str(col(r,blnIdx)):'', barang:str(col(r,brgIdx)),
-          qty:qtyIdx>=0?col(r,qtyIdx):null, satuan:satIdx>=0?str(col(r,satIdx)):'', jumlah:jmlIdx>=0?col(r,jmlIdx):null
-        })).filter(r=>r.cust&&r.barang);
-        if(rows.length>0) return rows;
+      let dragSrc = null;
+      function addDragHandlers(item) {
+        item.addEventListener("dragstart", (e) => {
+          dragSrc = item;
+          setTimeout(() => item.classList.add("dragging"), 0);
+          e.dataTransfer.effectAllowed = "move";
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("dragging");
+          dragSrc = null;
+        });
+        item.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (dragSrc && dragSrc !== item) item.classList.add("drag-target");
+        });
+        item.addEventListener("dragleave", () =>
+          item.classList.remove("drag-target"),
+        );
+        item.addEventListener("drop", (e) => {
+          e.preventDefault();
+          item.classList.remove("drag-target");
+          if (!dragSrc || dragSrc === item) return;
+          const a = parseInt(dragSrc.dataset.idx),
+            b = parseInt(item.dataset.idx);
+          const tmp = cols[a];
+          cols[a] = cols[b];
+          cols[b] = tmp;
+          renderCols();
+        });
       }
-    }
-  }
 
-  return [];
-}
+      $("btn-reset-cols").addEventListener("click", () => {
+        cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
+        renderCols();
+      });
+      $("btn-back-1").addEventListener("click", () => {
+        setStep(1);
+        showSection("upload");
+      });
+      $("btn-next-2").addEventListener("click", () => {
+        if (cols.filter((c) => c.enabled).length === 0) {
+          alert("Minimal 1 kolom harus aktif.");
+          return;
+        }
+        setStep(3);
+        showSection("process");
+        startProcessing();
+      });
 
-async function startProcessing(){
-  cancelled = false;
-  resultData = [];
-  errors = [];
-  $('log-box').innerHTML = '';
-  setProgress(0, 'Membaca ZIP...');
-  $('process-sub').textContent = 'Membaca file ZIP...';
-
-  let zip;
-  try{ zip = await JSZip.loadAsync(zipFile); }
-  catch(e){ log('Gagal membuka ZIP: '+e.message,'err'); return; }
-
-  const xlsxFiles = Object.keys(zip.files).filter(n => n.match(/\.xlsx$/i) && !zip.files[n].dir && !n.includes('~$'));
-  log(`Ditemukan ${xlsxFiles.length} file .xlsx`, 'info');
-
-  for(let i=0; i<xlsxFiles.length; i++){
-    if(cancelled){ log('Proses dibatalkan oleh pengguna.','err'); return; }
-    const name = xlsxFiles[i];
-    const shortName = name.replace(/^.*[\\/]/,'');
-    setProgress((i/xlsxFiles.length)*90, `Memproses: ${shortName}`);
-    $('process-sub').textContent = `Memproses file ${i+1} dari ${xlsxFiles.length}...`;
-
-    try{
-      const ab = await zip.files[name].async('arraybuffer');
-      const wb = XLSX.read(ab, {type:'array', cellDates:true, raw:true});
-      const rows = detectAndExtract(wb, shortName);
-      if(rows.length === 0){
-        log(`⚠ ${shortName}: tidak ada data yang bisa dibaca`, 'err');
-        errors.push({name:shortName, reason:'Tidak ada data atau format tidak dikenali'});
-      } else {
-        resultData.push(...rows);
-        log(`✓ ${shortName}: ${rows.length.toLocaleString()} baris`, 'ok');
+      // ─── Processing ────────────────────────────────────────────────────
+      function getMonthName(v) {
+        const months = [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
+        ];
+        if (v instanceof Date) return months[v.getMonth()] || "";
+        if (typeof v === "number" && v >= 1 && v <= 12) return months[v - 1];
+        if (typeof v === "string") {
+          const t = v.trim();
+          if (/^\d+$/.test(t)) return months[parseInt(t) - 1] || t;
+          return t;
+        }
+        return v || "";
       }
-    } catch(e){
-      log(`✗ ${shortName}: ${e.message}`, 'err');
-      errors.push({name:shortName, reason:e.message});
-    }
-    await new Promise(r=>setTimeout(r,10));
-  }
 
-  if(cancelled) return;
-  setProgress(100, 'Selesai!');
-  showResults(xlsxFiles.length);
-}
+      function xlsxDateToJS(serial) {
+        if (serial instanceof Date) return serial;
+        if (typeof serial === "number") {
+          const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+          return d;
+        }
+        return null;
+      }
 
-function showResults(total){
-  setStep(4); showSection('export');
-  const distSet = new Set(resultData.map(r=>r.dist));
-  $('stat-rows').textContent = resultData.length.toLocaleString();
-  $('stat-dist').textContent = distSet.size;
-  $('stat-ok').textContent = (total - errors.length);
-  $('stat-err').textContent = errors.length;
-  $('stat-err').style.color = errors.length > 0 ? 'var(--red)' : 'var(--text)';
+      function detectAndExtract(wb, fileName) {
+        const distName = fileName
+          .replace(/\.xlsx$/i, "")
+          .replace(/^.*[\\/]/, "");
+        let rows = [];
 
-  if(errors.length > 0){
-    $('err-summary').classList.remove('hidden');
-    $('err-list').innerHTML = errors.map(e=>`<div>• ${e.name} — ${e.reason}</div>`).join('');
-  }
-}
+        const trySheet = (sheetName, extractor) => {
+          if (!wb.SheetNames.includes(sheetName)) return false;
+          try {
+            const ws = wb.Sheets[sheetName];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            if (data.length < 2) return false;
+            rows = extractor(data, distName);
+            return rows.length > 0;
+          } catch (e) {
+            return false;
+          }
+        };
 
-$('btn-cancel').addEventListener('click', () => {
-  cancelled = true;
-  $('btn-cancel').disabled = true;
-  $('btn-cancel').textContent = 'Membatalkan...';
-  setTimeout(() => {
-    setStep(1); showSection('upload');
-    $('btn-cancel').disabled = false;
-    $('btn-cancel').innerHTML = '<i class="ti ti-x"></i> Batalkan Proses';
-  }, 600);
-});
+        const col = (row, idx) => (idx < row.length ? row[idx] : null);
+        const str = (v) => (v == null ? "" : String(v).trim());
 
-// ─── Export ────────────────────────────────────────────────────────
-$('btn-export').addEventListener('click', () => {
-  const activeCols = cols.filter(c=>c.enabled);
-  const headers = activeCols.map(c=>c.label);
-  const colMap = {dist:'dist',cust:'cust',bulan:'bulan',barang:'barang',qty:'qty',satuan:'satuan',jumlah:'jumlah'};
+        // Try "Rincian Penjualan per Barang" (Aldi, SAJ format variant)
+        if (wb.SheetNames.includes("Rincian Penjualan per Barang")) {
+          const ws = wb.Sheets["Rincian Penjualan per Barang"];
+          const data = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: null,
+            raw: true,
+          });
+          if (data.length > 1) {
+            const hdr = data[0] || [];
+            // SAJ: Cabang(0),Salesman(1),ID(2),Tanggal(3),Bulan(4),Nama Pelanggan(5),Nama Barang(6),Kuantitas(7),Satuan(8),@Harga(9),Penjualan(10)
+            // Aldi: Nomor(0),Tanggal(1),Bulan(2),No(3),Nama Pelanggan(4),Alamat(5),Penjual(6),Kode(7),Nama Barang(8),Kuantitas(9),Satuan(10),@Harga(11),Jml Keluar(12),Diskon(13),Total Harga(14)
+            const isSAJ = str(hdr[0]).toLowerCase().includes("cabang");
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => {
+                if (isSAJ)
+                  return {
+                    dist: distName,
+                    cust: str(col(r, 5)),
+                    bulan: getMonthName(xlsxDateToJS(col(r, 3))),
+                    barang: str(col(r, 6)),
+                    qty: col(r, 7),
+                    satuan: str(col(r, 8)),
+                    jumlah: col(r, 10),
+                  };
+                else
+                  return {
+                    dist: distName,
+                    cust: str(col(r, 4)),
+                    bulan: getMonthName(xlsxDateToJS(col(r, 1))),
+                    barang: str(col(r, 8)),
+                    qty: col(r, 9),
+                    satuan: str(col(r, 10)),
+                    jumlah: col(r, 14),
+                  };
+              })
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+        }
 
-  const wsData = [headers, ...resultData.map(row =>
-    activeCols.map(c => {
-      const v = row[colMap[c.id]];
-      if(v==null) return '';
-      if(c.id==='qty'||c.id==='jumlah') return typeof v==='number'?v:parseFloat(v)||'';
-      return String(v).trim();
-    })
-  )];
+        // UD Sejahtera Bwi: Rincian different columns
+        if (
+          wb.SheetNames.includes("Rincian Penjualan per Barang") &&
+          rows.length === 0
+        ) {
+          const ws = wb.Sheets["Rincian Penjualan per Barang"];
+          const data = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: null,
+            raw: true,
+          });
+          rows = data
+            .slice(1)
+            .filter((r) => r.some((v) => v != null))
+            .map((r) => ({
+              dist: distName,
+              cust: str(col(r, 10)),
+              bulan: str(col(r, 9)),
+              barang: str(col(r, 3)),
+              qty: col(r, 4),
+              satuan: str(col(r, 5)),
+              jumlah: col(r, 7),
+            }))
+            .filter((r) => r.cust && r.barang);
+          if (rows.length > 0) return rows;
+        }
 
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+        // Berkah Jaya: Penjualan_By_Salesman
+        for (const sn of wb.SheetNames) {
+          if (sn.startsWith("Penjualan_By_Salesman")) {
+            const ws = wb.Sheets[sn];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, 2)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, 4)),
+                qty: col(r, 5),
+                satuan: str(col(r, 6)),
+                jumlah: col(r, 9),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+        }
 
-  // column widths
-  const wscols = activeCols.map(c => {
-    if(c.id==='dist') return {wch:28};
-    if(c.id==='cust') return {wch:32};
-    if(c.id==='barang') return {wch:40};
-    if(c.id==='bulan') return {wch:14};
-    if(c.id==='qty'||c.id==='jumlah') return {wch:14};
-    if(c.id==='satuan') return {wch:10};
-    return {wch:20};
-  });
-  ws['!cols'] = wscols;
+        // PT Panda Ibe: data sheet
+        if (
+          trySheet("data", (data, dn) =>
+            data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: dn,
+                cust: str(col(r, 13)),
+                bulan: getMonthName(col(r, 3)),
+                barang: str(col(r, 19)),
+                qty: col(r, 23),
+                satuan: str(col(r, 22)),
+                jumlah: col(r, 30),
+              }))
+              .filter((r) => r.cust && r.barang),
+          )
+        )
+          return rows;
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'COLLECT DB');
+        // MJAP Tasikmalaya: Laporan_Penjualan_Format2
+        if (
+          trySheet("Laporan_Penjualan_Format2", (data, dn) =>
+            data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: dn,
+                cust: str(col(r, 5)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, 11)),
+                qty: col(r, 14),
+                satuan: str(col(r, 15)),
+                jumlah: col(r, 17),
+              }))
+              .filter((r) => r.cust && r.barang),
+          )
+        )
+          return rows;
 
-  const now = new Date();
-  const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-  XLSX.writeFile(wb, `COLLECT_DB_GABUNGAN_${ts}.xlsx`);
-});
+        // list-faktur-penjualan (Aquilla)
+        if (
+          trySheet("list-faktur-penjualan", (data, dn) =>
+            data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: dn,
+                cust: str(col(r, 6)),
+                bulan: getMonthName(xlsxDateToJS(col(r, 2))),
+                barang: str(col(r, 14)),
+                qty: col(r, 17),
+                satuan: str(col(r, 18)),
+                jumlah: col(r, 20),
+              }))
+              .filter((r) => r.cust && r.barang),
+          )
+        )
+          return rows;
 
-$('btn-restart').addEventListener('click', () => {
-  zipFile = null; resultData = []; errors = [];
-  $('file-selected').classList.add('hidden');
-  dropZone.classList.remove('hidden');
-  $('file-input').value = '';
-  $('btn-next-1').disabled = true;
-  $('err-summary').classList.add('hidden');
-  $('stat-err').style.color = 'var(--text)';
-  cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
-  setStep(1); showSection('upload');
-});
-</script>
-</body>
+        // Page1 (Anugrah)
+        if (
+          trySheet("Page1", (data, dn) =>
+            data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: dn,
+                cust: str(col(r, 6)),
+                bulan: str(col(r, 4)),
+                barang: str(col(r, 8)),
+                qty: col(r, 9),
+                satuan: str(col(r, 10)),
+                jumlah: col(r, 15),
+              }))
+              .filter((r) => r.cust && r.barang),
+          )
+        )
+          return rows;
+
+        // Penjualan_By_Salesman variant
+        if (
+          trySheet("Penjualan_By_Salesman_01Jan2026", (data, dn) =>
+            data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: dn,
+                cust: str(col(r, 2)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, 4)),
+                qty: col(r, 5),
+                satuan: str(col(r, 6)),
+                jumlah: col(r, 9),
+              }))
+              .filter((r) => r.cust && r.barang),
+          )
+        )
+          return rows;
+
+        // DATA sheet (Ananta Tegal, Sinar Sukses, CC Jaya, Pilar, Slamet)
+        if (wb.SheetNames.includes("DATA")) {
+          const ws = wb.Sheets["DATA"];
+          const data = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: null,
+            raw: true,
+          });
+          const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
+
+          // CC Jaya Sukabumi: has NAMACUSTOMER col
+          if (hdr.some((h) => h.includes("NAMACUSTOMER"))) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, 16)),
+                bulan: getMonthName(col(r, 31)),
+                barang: str(col(r, 12)),
+                qty: col(r, 37),
+                satuan: str(col(r, 74)),
+                jumlah: col(r, 47),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+          // Pilar Utama: has DISTID col
+          if (hdr[0] === "DISTID" || hdr.some((h) => h === "DISTID")) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, 18)),
+                bulan: getMonthName(xlsxDateToJS(col(r, 4))),
+                barang: str(col(r, 41)),
+                qty: col(r, 78),
+                satuan: str(col(r, 77) || "KRT"),
+                jumlah: col(r, 85),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+          // Slamet: has 'Bulan Faktur'
+          if (hdr.some((h) => h.includes("BULAN FAKTUR"))) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, 1)),
+                bulan: getMonthName(col(r, 4)),
+                barang: str(col(r, 10)),
+                qty: col(r, 11),
+                satuan: str(col(r, 12)),
+                jumlah: col(r, 25),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+          // Sinar Sukses: TGL,BLN,Kode,NAMA TOKO
+          if (
+            hdr[3] === "NAMA TOKO" ||
+            hdr.some((h) => h.includes("NAMA TOKO"))
+          ) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, 3)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, 4)),
+                qty: col(r, 5),
+                satuan: str(col(r, 6)),
+                jumlah: col(r, 9),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+          // Ananta Tegal/Pekalongan: Tanggal,Bulan,Nomor Nota...Nama Pelanggan
+          const qtyIdx = hdr.findIndex((h) => h === "QTY");
+          const custIdx = hdr.findIndex((h) => h.includes("NAMA PELANGGAN"));
+          const brgIdx = hdr.findIndex(
+            (h) => h === "NAMA BARANG" || h === "KODE",
+          );
+          const jmlIdx = hdr.findIndex((h) => h.includes("JUMLAH"));
+          const satIdx = hdr.findIndex((h) => h === "SAT");
+          if (custIdx >= 0 && qtyIdx >= 0) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, custIdx)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, brgIdx >= 0 ? brgIdx : 5)),
+                qty: col(r, qtyIdx),
+                satuan: str(col(r, satIdx >= 0 ? satIdx : qtyIdx + 1)),
+                jumlah: col(r, jmlIdx >= 0 ? jmlIdx : qtyIdx + 4),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+          // generic DATA fallback
+          if (data.length > 1) {
+            rows = data
+              .slice(1)
+              .filter((r) => r.some((v) => v != null))
+              .map((r) => ({
+                dist: distName,
+                cust: str(col(r, custIdx >= 0 ? custIdx : 10)),
+                bulan: str(col(r, 1)),
+                barang: str(col(r, 5)),
+                qty: col(r, qtyIdx >= 0 ? qtyIdx : 12),
+                satuan: str(col(r, satIdx >= 0 ? satIdx : 13)),
+                jumlah: col(r, jmlIdx >= 0 ? jmlIdx : 16),
+              }))
+              .filter((r) => r.cust && r.barang);
+            if (rows.length > 0) return rows;
+          }
+        }
+
+        // Laporan_Penjualan_Format2 (generic)
+        for (const sn of wb.SheetNames) {
+          if (
+            sn.toLowerCase().includes("laporan") ||
+            sn.toLowerCase().includes("penjualan")
+          ) {
+            if (
+              trySheet(sn, (data, dn) => {
+                const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
+                const custIdx = hdr.findIndex(
+                  (h) =>
+                    h.includes("PELANGGAN") ||
+                    h.includes("CUSTOMER") ||
+                    h.includes("CUST"),
+                );
+                const brgIdx = hdr.findIndex(
+                  (h) =>
+                    h.includes("BARANG") ||
+                    h.includes("PRODUK") ||
+                    h.includes("ITEM"),
+                );
+                const qtyIdx = hdr.findIndex(
+                  (h) =>
+                    h === "QTY" ||
+                    h === "KUANTITAS" ||
+                    (h === "JUMLAH" && !h.includes("RP")),
+                );
+                const blnIdx = hdr.findIndex(
+                  (h) => h === "BULAN" || h === "BLN",
+                );
+                const satIdx = hdr.findIndex(
+                  (h) => h === "SATUAN" || h === "SAT",
+                );
+                const jmlIdx = hdr.findIndex(
+                  (h) =>
+                    h === "NETO" ||
+                    h === "SUBTOTAL" ||
+                    h === "TOTAL HARGA" ||
+                    h === "NILAI",
+                );
+                if (custIdx < 0 || brgIdx < 0) return [];
+                return data
+                  .slice(1)
+                  .filter((r) => r.some((v) => v != null))
+                  .map((r) => ({
+                    dist: dn,
+                    cust: str(col(r, custIdx)),
+                    bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
+                    barang: str(col(r, brgIdx)),
+                    qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
+                    satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
+                    jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : null,
+                  }))
+                  .filter((r) => r.cust && r.barang);
+              })
+            )
+              return rows;
+          }
+        }
+
+        // RAW sheet (Bravo Eterna)
+        for (const sn of wb.SheetNames) {
+          if (sn.toUpperCase().startsWith("RAW")) {
+            const ws = wb.Sheets[sn];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            // find header row
+            let hdrIdx = data.findIndex((r) =>
+              r.some(
+                (v) =>
+                  str(v).toUpperCase() === "NMCUST" ||
+                  str(v).toUpperCase() === "NMBRG",
+              ),
+            );
+            if (hdrIdx >= 0) {
+              const hdr = data[hdrIdx].map((v) => str(v).toUpperCase());
+              const custIdx = hdr.indexOf("NMCUST"),
+                brgIdx = hdr.indexOf("NMBRG"),
+                tglIdx = hdr.indexOf("TANGGAL");
+              const qtyIdx = hdr.indexOf("JUMLAH"),
+                satIdx = hdr.indexOf("SAT"),
+                jmlIdx = hdr.indexOf("TOTAL");
+              rows = data
+                .slice(hdrIdx + 1)
+                .filter((r) => r.some((v) => v != null))
+                .map((r) => ({
+                  dist: distName,
+                  cust: str(col(r, custIdx)),
+                  bulan: getMonthName(
+                    xlsxDateToJS(col(r, tglIdx >= 0 ? tglIdx : 2)),
+                  ),
+                  barang: str(col(r, brgIdx)),
+                  qty: col(r, qtyIdx >= 0 ? qtyIdx : 11),
+                  satuan: str(col(r, satIdx >= 0 ? satIdx : 12)),
+                  jumlah: col(r, jmlIdx >= 0 ? jmlIdx : 18),
+                }))
+                .filter((r) => r.cust && r.barang);
+              if (rows.length > 0) return rows;
+            }
+          }
+        }
+
+        // Sheet1 generic fallback
+        for (const sn of ["Sheet1", "Sheet2", "Cipta Anugerah Rezeki"]) {
+          if (wb.SheetNames.includes(sn)) {
+            const ws = wb.Sheets[sn];
+            const data = XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              defval: null,
+              raw: true,
+            });
+            if (data.length < 2) continue;
+            const hdr = (data[0] || []).map((v) => str(v).toUpperCase());
+            const custIdx = hdr.findIndex(
+              (h) =>
+                h.includes("NAMA CUSTOMER") ||
+                h.includes("NAMA PELANGGAN") ||
+                h.includes("CUSTOMER"),
+            );
+            const brgIdx = hdr.findIndex(
+              (h) =>
+                h.includes("NAMA BARANG") ||
+                h.includes("NAMA PRODUK") ||
+                h.includes("NAMA PRODUCT"),
+            );
+            const qtyIdx = hdr.findIndex(
+              (h) => h === "QTY" || h === "KUANTITAS",
+            );
+            const blnIdx = hdr.findIndex((h) => h === "BULAN" || h === "BLN");
+            const satIdx = hdr.findIndex((h) => h === "SATUAN" || h === "SAT");
+            const jmlIdx = hdr.findIndex(
+              (h) =>
+                h.includes("NET AMOUNT") ||
+                h.includes("SUBTOTAL") ||
+                h.includes("TOTAL"),
+            );
+            if (custIdx >= 0 && brgIdx >= 0) {
+              rows = data
+                .slice(1)
+                .filter((r) => r.some((v) => v != null))
+                .map((r) => ({
+                  dist: distName,
+                  cust: str(col(r, custIdx)),
+                  bulan: blnIdx >= 0 ? str(col(r, blnIdx)) : "",
+                  barang: str(col(r, brgIdx)),
+                  qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
+                  satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
+                  jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : null,
+                }))
+                .filter((r) => r.cust && r.barang);
+              if (rows.length > 0) return rows;
+            }
+          }
+        }
+
+        return [];
+      }
+
+      async function startProcessing() {
+        cancelled = false;
+        resultData = [];
+        errors = [];
+        $("log-box").innerHTML = "";
+        setProgress(0, "Membaca ZIP...");
+        $("process-sub").textContent = "Membaca file ZIP...";
+
+        let zip;
+        try {
+          zip = await JSZip.loadAsync(zipFile);
+        } catch (e) {
+          log("Gagal membuka ZIP: " + e.message, "err");
+          return;
+        }
+
+        const xlsxFiles = Object.keys(zip.files).filter(
+          (n) => n.match(/\.xlsx$/i) && !zip.files[n].dir && !n.includes("~$"),
+        );
+        log(`Ditemukan ${xlsxFiles.length} file .xlsx`, "info");
+
+        for (let i = 0; i < xlsxFiles.length; i++) {
+          if (cancelled) {
+            log("Proses dibatalkan oleh pengguna.", "err");
+            return;
+          }
+          const name = xlsxFiles[i];
+          const shortName = name.replace(/^.*[\\/]/, "");
+          setProgress((i / xlsxFiles.length) * 90, `Memproses: ${shortName}`);
+          $("process-sub").textContent =
+            `Memproses file ${i + 1} dari ${xlsxFiles.length}...`;
+
+          try {
+            const ab = await zip.files[name].async("arraybuffer");
+            const wb = XLSX.read(ab, {
+              type: "array",
+              cellDates: true,
+              raw: true,
+            });
+            const rows = detectAndExtract(wb, shortName);
+            if (rows.length === 0) {
+              log(`⚠ ${shortName}: tidak ada data yang bisa dibaca`, "err");
+              errors.push({
+                name: shortName,
+                reason: "Tidak ada data atau format tidak dikenali",
+              });
+            } else {
+              resultData.push(...rows);
+              log(
+                `✓ ${shortName}: ${rows.length.toLocaleString()} baris`,
+                "ok",
+              );
+            }
+          } catch (e) {
+            log(`✗ ${shortName}: ${e.message}`, "err");
+            errors.push({ name: shortName, reason: e.message });
+          }
+          await new Promise((r) => setTimeout(r, 10));
+        }
+
+        if (cancelled) return;
+        setProgress(100, "Selesai!");
+        showResults(xlsxFiles.length);
+      }
+
+      function showResults(total) {
+        setStep(4);
+        showSection("export");
+        const distSet = new Set(resultData.map((r) => r.dist));
+        $("stat-rows").textContent = resultData.length.toLocaleString();
+        $("stat-dist").textContent = distSet.size;
+        $("stat-ok").textContent = total - errors.length;
+        $("stat-err").textContent = errors.length;
+        $("stat-err").style.color =
+          errors.length > 0 ? "var(--red)" : "var(--text)";
+
+        if (errors.length > 0) {
+          $("err-summary").classList.remove("hidden");
+          $("err-list").innerHTML = errors
+            .map((e) => `<div>• ${e.name} — ${e.reason}</div>`)
+            .join("");
+        }
+      }
+
+      $("btn-cancel").addEventListener("click", () => {
+        cancelled = true;
+        $("btn-cancel").disabled = true;
+        $("btn-cancel").textContent = "Membatalkan...";
+        setTimeout(() => {
+          setStep(1);
+          showSection("upload");
+          $("btn-cancel").disabled = false;
+          $("btn-cancel").innerHTML = '<i class="ti ti-x"></i> Batalkan Proses';
+        }, 600);
+      });
+
+      // ─── Export ────────────────────────────────────────────────────────
+      $("btn-export").addEventListener("click", () => {
+        const activeCols = cols.filter((c) => c.enabled);
+        const headers = activeCols.map((c) => c.label);
+        const colMap = {
+          dist: "dist",
+          cust: "cust",
+          bulan: "bulan",
+          barang: "barang",
+          qty: "qty",
+          satuan: "satuan",
+          jumlah: "jumlah",
+        };
+
+        const wsData = [
+          headers,
+          ...resultData.map((row) =>
+            activeCols.map((c) => {
+              const v = row[colMap[c.id]];
+              if (v == null) return "";
+              if (c.id === "qty" || c.id === "jumlah")
+                return typeof v === "number" ? v : parseFloat(v) || "";
+              return String(v).trim();
+            }),
+          ),
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // column widths
+        const wscols = activeCols.map((c) => {
+          if (c.id === "dist") return { wch: 28 };
+          if (c.id === "cust") return { wch: 32 };
+          if (c.id === "barang") return { wch: 40 };
+          if (c.id === "bulan") return { wch: 14 };
+          if (c.id === "qty" || c.id === "jumlah") return { wch: 14 };
+          if (c.id === "satuan") return { wch: 10 };
+          return { wch: 20 };
+        });
+        ws["!cols"] = wscols;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "COLLECT DB");
+
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+        XLSX.writeFile(wb, `COLLECT_DB_GABUNGAN_${ts}.xlsx`);
+      });
+
+      $("btn-restart").addEventListener("click", () => {
+        zipFile = null;
+        resultData = [];
+        errors = [];
+        $("file-selected").classList.add("hidden");
+        dropZone.classList.remove("hidden");
+        $("file-input").value = "";
+        $("btn-next-1").disabled = true;
+        $("err-summary").classList.add("hidden");
+        $("stat-err").style.color = "var(--text)";
+        cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
+        setStep(1);
+        showSection("upload");
+      });
+    </script>
+  </body>
 </html>

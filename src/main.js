@@ -1,10 +1,8 @@
 window.addEventListener("DOMContentLoaded", () => {
-
   const app = document.getElementById("app");
 
   async function loadPage(page, addToHistory = true) {
     try {
-
       const response = await fetch(`/public/pages/${page}.html`);
 
       if (!response.ok) {
@@ -18,9 +16,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (addToHistory) {
         history.pushState({ page }, "", `#${page}`);
       }
-
     } catch (error) {
-
       console.error(error);
 
       app.innerHTML = `
@@ -36,11 +32,8 @@ window.addEventListener("DOMContentLoaded", () => {
   loadPage("home");
 
   window.addEventListener("popstate", (event) => {
-
     const page = event.state?.page || "home";
 
     loadPage(page, false);
-
   });
-
 });
