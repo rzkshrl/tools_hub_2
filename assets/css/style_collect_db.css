@@ -597,6 +597,16 @@ body {
   background: var(--blue);
   border-radius: 3px;
   transition: width 0.3s;
+  will-change: width;
+}
+/* Mapping table: contain layout/paint to avoid full-page reflow on row updates */
+#db-map-table {
+  contain: layout style;
+}
+/* colmap panels: skip rendering when closed */
+.colmap-panel:not(.open) {
+  content-visibility: hidden;
+  contain-intrinsic-size: 0 100px;
 }
 
 /* Log */
@@ -683,6 +693,11 @@ body {
 .section {
   animation: fadeIn 0.2s ease;
 }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -692,6 +707,10 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+.ti-loader {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }
 
 /* Reset hint */

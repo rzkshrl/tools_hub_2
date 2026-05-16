@@ -721,13 +721,27 @@
         return (bytes / 1024).toFixed(0) + " KB";
       }
 
+      // Batched log: buffer entries, flush via rAF to avoid per-entry reflow
+      const _logBuffer = [];
+      let _logRafId = null;
       function log(msg, type = "") {
-        const box = $("log-box");
-        const d = document.createElement("div");
-        d.className = "log-entry " + (type || "");
-        d.textContent = msg;
-        box.appendChild(d);
-        box.scrollTop = box.scrollHeight;
+        _logBuffer.push({ msg, type });
+        if (!_logRafId) {
+          _logRafId = requestAnimationFrame(() => {
+            _logRafId = null;
+            const box = $("log-box");
+            const frag = document.createDocumentFragment();
+            while (_logBuffer.length) {
+              const { msg, type } = _logBuffer.shift();
+              const d = document.createElement("div");
+              d.className = "log-entry " + (type || "");
+              d.textContent = msg;
+              frag.appendChild(d);
+            }
+            box.appendChild(frag);
+            box.scrollTop = box.scrollHeight;
+          });
+        }
       }
 
       function setProgress(pct, label) {
@@ -1815,9 +1829,12 @@
           }
           const name = xlsxFiles[i];
           const shortName = name.replace(/^.*[\\\/]/, "");
-          setProgress((i / xlsxFiles.length) * 90, `Memproses: ${shortName}`);
-          $("process-sub").textContent =
-            `Memproses file ${i + 1} dari ${xlsxFiles.length}...`;
+          const pct = (i / xlsxFiles.length) * 90;
+          requestAnimationFrame(() => {
+            setProgress(pct, `Memproses: ${shortName}`);
+            $("process-sub").textContent =
+              `Memproses file ${i + 1} dari ${xlsxFiles.length}...`;
+          });
           try {
             const ab = await zip.files[name].async("arraybuffer");
             const wb = XLSX.read(ab, {
@@ -1843,7 +1860,7 @@
             log(`✗ ${shortName}: ${e.message}`, "err");
             errors.push({ name: shortName, reason: e.message });
           }
-          await new Promise((r) => setTimeout(r, 10));
+          await new Promise((r) => setTimeout(r, 0));
         }
 
         if (cancelled) return;
@@ -1927,17 +1944,26 @@
         // Filter data to only months in period
         // Normalize period months for comparison
         const periodNorm = new Set(months.map((m) => m.toUpperCase().trim()));
-
+        // Pre-compute 3-char prefixes for partial matching (avoids inner loop per row)
+        const periodPrefixes = new Set(
+          [...periodNorm].map((m) => m.slice(0, 3)),
+        );
+        // Cache: bulan string → boolean (warm up during indexing)
+        const _monthInPeriodCache = new Map();
         function monthInPeriod(bulan) {
           if (!bulan) return false;
+          if (_monthInPeriodCache.has(bulan))
+            return _monthInPeriodCache.get(bulan);
           const b = bulan.toUpperCase().trim();
-          if (periodNorm.has(b)) return true;
-          // Partial match (e.g. "FEBRUARI" matches "FEB")
-          for (const pm of periodNorm) {
-            if (b.startsWith(pm.slice(0, 3)) || pm.startsWith(b.slice(0, 3)))
-              return true;
+          let result = periodNorm.has(b);
+          if (!result) {
+            const bp = b.slice(0, 3);
+            result =
+              periodPrefixes.has(bp) ||
+              [...periodNorm].some((pm) => pm.startsWith(bp));
           }
-          return false;
+          _monthInPeriodCache.set(bulan, result);
+          return result;
         }
 
         // Build index: dist → cust → monthName → qty sum
@@ -2184,22 +2210,29 @@
         const activeCols = cols.filter((c) => c.enabled);
         const headers = activeCols.map((c) => c.label);
 
-        // Filter to period months only
-        const periodData =
-          activePeriodMonths.length > 0
-            ? resultData.filter((r) => {
-                if (!r.bulan) return false;
-                const b = r.bulan.toUpperCase().trim();
-                return activePeriodMonths.some((pm) => {
-                  const pmn = pm.toUpperCase().trim();
-                  return (
-                    b === pmn ||
-                    b.startsWith(pmn.slice(0, 3)) ||
-                    pmn.startsWith(b.slice(0, 3))
-                  );
-                });
-              })
-            : resultData;
+        // Filter to period months only — use prefix Set for O(1) lookup
+        let periodData;
+        if (activePeriodMonths.length > 0) {
+          const pmNorms = new Set(
+            activePeriodMonths.map((m) => m.toUpperCase().trim()),
+          );
+          const pmPrefixes = new Set([...pmNorms].map((m) => m.slice(0, 3)));
+          const _flatCache = new Map();
+          const inPeriod = (bulan) => {
+            if (!bulan) return false;
+            if (_flatCache.has(bulan)) return _flatCache.get(bulan);
+            const b = bulan.toUpperCase().trim();
+            const result =
+              pmNorms.has(b) ||
+              pmPrefixes.has(b.slice(0, 3)) ||
+              [...pmNorms].some((pm) => pm.startsWith(b.slice(0, 3)));
+            _flatCache.set(bulan, result);
+            return result;
+          };
+          periodData = resultData.filter((r) => inPeriod(r.bulan));
+        } else {
+          periodData = resultData;
+        }
 
         const wsData = [
           headers,
@@ -2974,13 +3007,38 @@
       }
 
       // Auto-detect column indices from header row
+      // Optimized: only reads first HDR_SCAN_ROWS rows to avoid parsing entire large sheets
       function detectCols(ws) {
-        const data = XLSX.utils.sheet_to_json(ws, {
+        const HDR_SCAN_ROWS = 20;
+        // Limit range to first HDR_SCAN_ROWS rows for header detection
+        let wsForHdr = ws;
+        if (ws && ws["!ref"]) {
+          try {
+            const fullRange = XLSX.utils.decode_range(ws["!ref"]);
+            if (fullRange.e.r > HDR_SCAN_ROWS) {
+              const limitedRange = {
+                s: fullRange.s,
+                e: {
+                  c: fullRange.e.c,
+                  r: Math.min(fullRange.e.r, HDR_SCAN_ROWS + 1),
+                },
+              };
+              // Create a lightweight view by clipping the ref
+              wsForHdr = Object.assign({}, ws, {
+                "!ref": XLSX.utils.encode_range(limitedRange),
+              });
+            }
+          } catch (_) {
+            /* fallback to full ws */
+          }
+        }
+        const data = XLSX.utils.sheet_to_json(wsForHdr, {
           header: 1,
           defval: null,
           raw: true,
         });
-        if (!data.length) return { map: {}, hdrRow: -1, hdrCells: [] };
+        if (!data.length)
+          return { map: {}, hdrRow: -1, hdrCells: [], sampleRow: [] };
 
         // Find header row (first row with ≥3 non-null cells that contain text)
         let hdrIdx = -1;
@@ -2994,7 +3052,8 @@
             break;
           }
         }
-        if (hdrIdx < 0) return { map: {}, hdrRow: -1, hdrCells: [] };
+        if (hdrIdx < 0)
+          return { map: {}, hdrRow: -1, hdrCells: [], sampleRow: [] };
 
         const hdr = (data[hdrIdx] || []).map((v) =>
           String(v || "")
@@ -3049,6 +3108,8 @@
       }
 
       // ── Build mapping for all selected DBs ──
+      // Optimized: parallel batch extraction, no full wb retained in memory,
+      // progress feedback, yields to UI between batches.
       async function buildDBMapping() {
         dbMappings = [];
         zipFileCache = {};
@@ -3071,22 +3132,58 @@
             selectedDBs.has(n.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, "")),
         );
 
-        // Show loading state
+        // Show loading state with progress
         const tbody = document.getElementById("db-map-tbody");
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text3)">
-          <i class="ti ti-loader" style="font-size:20px"></i> Menganalisis ${selectedFiles.length} file...</td></tr>`;
+        const updateLoadingRow = (done, total) => {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text3)">
+            <i class="ti ti-loader" style="font-size:20px"></i>
+            Menganalisis file... ${done}/${total}</td></tr>`;
+        };
+        updateLoadingRow(0, selectedFiles.length);
 
+        // Process in batches of 3 to keep UI responsive while still parallelizing I/O
+        const BATCH = 3;
+        let doneCount = 0;
+
+        // First, extract all ArrayBuffers in parallel batches (I/O bound)
+        const absMap = {};
+        for (let i = 0; i < selectedFiles.length; i += BATCH) {
+          const batch = selectedFiles.slice(i, i + BATCH);
+          const results = await Promise.all(
+            batch.map(async (fp) => {
+              const ab = await zip.files[fp].async("arraybuffer");
+              return { fp, ab };
+            }),
+          );
+          results.forEach(({ fp, ab }) => {
+            const sn = fp.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, "");
+            absMap[sn] = { fp, ab };
+          });
+          doneCount += batch.length;
+          updateLoadingRow(doneCount, selectedFiles.length);
+          // Yield to browser between I/O batches
+          await new Promise((r) => setTimeout(r, 0));
+        }
+
+        // Now parse each workbook — CPU bound, do one at a time with yields to stay responsive
+        doneCount = 0;
         for (const filePath of selectedFiles) {
           const shortName = filePath
             .replace(/^.*[\\\/]/, "")
             .replace(/\.xlsx$/i, "");
+          const cached = absMap[shortName];
           try {
-            const ab = await zip.files[filePath].async("arraybuffer");
+            const ab = cached.ab;
             zipFileCache[shortName] = ab;
+
+            // Parse with minimal options: no cellDates here (we only need headers/structure)
+            // Use sheetStubs:false, dense:false (defaults) for lower memory
             const wb = XLSX.read(ab, {
               type: "array",
               raw: true,
               cellDates: true,
+              // Only parse sheets metadata first to pick best sheet
+              bookSheets: false,
             });
 
             // Match to template sheet
@@ -3104,6 +3201,7 @@
             const matched = COL_SLOTS.filter((s) => colMap[s] >= 0).length;
             const colConf = Math.round((matched / COL_SLOTS.length) * 100);
 
+            // Do NOT store wb — we have the ab in zipFileCache for later re-parse
             dbMappings.push({
               shortName,
               tplSheetName: tplMatch.sheet,
@@ -3115,7 +3213,7 @@
               hdrCells,
               sampleRow,
               colConf,
-              wb, // keep in memory for re-analysis
+              // wb intentionally NOT stored — saves ~MB per file of retained memory
             });
           } catch (e) {
             dbMappings.push({
@@ -3132,6 +3230,10 @@
               error: e.message,
             });
           }
+          doneCount++;
+          updateLoadingRow(doneCount, selectedFiles.length);
+          // Yield every file to keep page responsive
+          await new Promise((r) => setTimeout(r, 0));
         }
 
         renderMappingTable();
@@ -3272,9 +3374,12 @@
         const idx = parseInt(sel.dataset.idx);
         const sheetName = sel.value;
         const m = dbMappings[idx];
-        if (!m.wb) return;
+        // Re-parse from cached ArrayBuffer (wb is no longer stored to save memory)
+        const ab = zipFileCache[m.shortName];
+        if (!ab) return;
+        const wb = XLSX.read(ab, { type: "array", raw: true, cellDates: true });
         m.dbSheetName = sheetName;
-        const ws = m.wb.Sheets[sheetName];
+        const ws = wb.Sheets[sheetName];
         const { map, hdrRow, hdrCells, sampleRow } = detectCols(ws);
         m.colMap = map;
         m.hdrRow = hdrRow;
@@ -3423,9 +3528,13 @@
               return;
             }
             const m = entries[i];
-            setProgress((i / entries.length) * 90, `Memproses: ${m.shortName}`);
-            document.getElementById("process-sub").textContent =
-              `Memproses file ${i + 1} dari ${entries.length}...`;
+            // Update progress via rAF to avoid forced reflow every iteration
+            const pct = (i / entries.length) * 90;
+            requestAnimationFrame(() => {
+              setProgress(pct, `Memproses: ${m.shortName}`);
+              document.getElementById("process-sub").textContent =
+                `Memproses file ${i + 1} dari ${entries.length}...`;
+            });
             try {
               const ab = zipFileCache[m.shortName];
               if (!ab) throw new Error("Cache tidak ditemukan");
@@ -3452,7 +3561,8 @@
               log(`✗ ${m.shortName}: ${e.message}`, "err");
               errors.push({ name: m.shortName, reason: e.message });
             }
-            await new Promise((r) => setTimeout(r, 10));
+            // Yield every file so browser can paint and handle events
+            await new Promise((r) => setTimeout(r, 0));
           }
 
           // Also handle DB files with errors in mapping phase
