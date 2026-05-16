@@ -2546,8 +2546,9 @@
 
       function openMatcher() {
         $("matcher-overlay").classList.remove("hidden");
-        renderBulanReport();
-        renderMatcherDistGrid();
+        // Show skeleton immediately so user knows it's loading
+        _renderBulanReportAsync();
+        _renderMatcherDistGridAsync();
         if (matcherCurrentDist) renderMatcherTable(matcherCurrentDist);
       }
       function closeMatcher() {
@@ -2561,15 +2562,18 @@
         });
         if (tab === "cust") {
           $("btn-apply-matches").style.display = "inline-flex";
-          renderMatcherDistGrid();
+          _renderMatcherDistGridAsync();
         } else {
           $("btn-apply-matches").style.display = "none";
-          renderBulanReport();
+          _renderBulanReportAsync();
         }
       }
 
-      // ── Bulan normalization report ──
+      // ── Bulan normalization report — async with skeleton ──
       function renderBulanReport() {
+        _renderBulanReportAsync();
+      }
+      function _renderBulanReportAsync() {
         const el = $("bulan-norm-report");
         const dists = Object.keys(bulanNormStats);
         if (dists.length === 0) {
@@ -2577,46 +2581,53 @@
             '<div class="alert alert-info"><i class="ti ti-circle-check"></i><span>Semua data bulan sudah dalam format standar. Tidak ada normalisasi yang diperlukan.</span></div>';
           return;
         }
-        let html = "";
-        dists.forEach((dist) => {
-          const map = bulanNormStats[dist];
-          const entries = Object.entries(map);
-          html += `<div class="bulan-alert">
-            <i class="ti ti-alert-triangle" style="flex-shrink:0; margin-top:1px"></i>
-            <div style="flex:1">
-              <strong>${dist}</strong> — ${entries.length} format bulan berbeda ditemukan dan dinormalisasi otomatis:
-              <table class="norm-table">
-                <tr><td style="color:var(--text2); font-weight:400">Format Asli (dalam DB)</td><td>Format Standar (setelah normalisasi)</td></tr>
-                ${entries.map(([orig, normed]) => `<tr><td>${esc(orig)}</td><td>→ ${esc(normed)}</td></tr>`).join("")}
-              </table>
-            </div>
-          </div>`;
+        // Show skeleton first
+        el.innerHTML = `<div class="matcher-skeleton">
+          <div class="skeleton-line" style="width:60%"></div>
+          <div class="skeleton-line" style="width:80%"></div>
+          <div class="skeleton-line" style="width:50%"></div>
+        </div>`;
+        // Render content off the critical path
+        requestAnimationFrame(() => {
+          const frag = document.createDocumentFragment();
+          dists.forEach((dist) => {
+            const map = bulanNormStats[dist];
+            const entries = Object.entries(map);
+            const wrapper = document.createElement("div");
+            wrapper.className = "bulan-alert";
+            wrapper.innerHTML = `<i class="ti ti-alert-triangle" style="flex-shrink:0; margin-top:1px"></i>
+              <div style="flex:1">
+                <strong>${esc(dist)}</strong> — ${entries.length} format bulan berbeda ditemukan dan dinormalisasi otomatis:
+                <table class="norm-table">
+                  <tr><td style="color:var(--text2); font-weight:400">Format Asli (dalam DB)</td><td>Format Standar (setelah normalisasi)</td></tr>
+                  ${entries.map(([orig, normed]) => `<tr><td>${esc(orig)}</td><td>→ ${esc(normed)}</td></tr>`).join("")}
+                </table>
+              </div>`;
+            frag.appendChild(wrapper);
+          });
+          el.innerHTML = "";
+          el.appendChild(frag);
         });
-        el.innerHTML = html;
       }
 
       // ── Customer fuzzy match per distributor ──
+      // Now async: computes per-distributor in chunks, yields to UI between each
+      let _matcherBuilding = false;
       function buildMatcherResults() {
+        // Synchronous fast-path: only if data is small or already computed
         if (!tplActive || !tplDistOrder.length) return;
-        // Get RO customer list from template (Sheet1 parse — we already have tplDistOrder, but need customers)
-        // Actually: we match DB customers vs RO customer list extracted from the template's data sheet
-        // For now: match DB customers vs all other DB customers across all distributions (deduped) —
-        // but better: match vs template's existing customer names if available, else vs all DB custs
         const allDbCusts = new Set();
         resultData.forEach((r) => {
           if (r.cust) allDbCusts.add(r.cust);
         });
         const roCusts =
           tplROCustomers.length > 0 ? tplROCustomers : Array.from(allDbCusts);
-
-        // Group DB customers by distributor
         const dbCustsByDist = {};
         resultData.forEach((r) => {
           if (!r.dist || !r.cust) return;
           if (!dbCustsByDist[r.dist]) dbCustsByDist[r.dist] = new Set();
           dbCustsByDist[r.dist].add(r.cust);
         });
-
         matcherResults = {};
         Object.entries(dbCustsByDist).forEach(([dist, custSet]) => {
           const rows = [];
@@ -2625,140 +2636,316 @@
               dbCust,
               roCusts.filter((c) => c !== dbCust),
             );
-            // Exact match — skip (confidence 100%)
             const exactInRo = roCusts.includes(dbCust);
-            if (exactInRo) {
+            if (exactInRo)
               rows.push({ dbCust, roCust: dbCust, score: 100, exact: true });
-            } else if (m) {
+            else if (m)
               rows.push({
                 dbCust,
                 roCust: m.name,
                 score: m.score,
                 exact: false,
               });
-            } else {
-              rows.push({ dbCust, roCust: null, score: 0, exact: false });
-            }
+            else rows.push({ dbCust, roCust: null, score: 0, exact: false });
           });
-          rows.sort((a, b) => a.score - b.score); // low confidence first
+          rows.sort((a, b) => a.score - b.score);
           matcherResults[dist] = rows;
         });
+      }
+
+      async function buildMatcherResultsAsync(onDistDone) {
+        if (_matcherBuilding) return;
+        _matcherBuilding = true;
+        if (!tplActive || !tplDistOrder.length) {
+          _matcherBuilding = false;
+          return;
+        }
+
+        const allDbCusts = new Set();
+        resultData.forEach((r) => {
+          if (r.cust) allDbCusts.add(r.cust);
+        });
+        const roCusts =
+          tplROCustomers.length > 0 ? tplROCustomers : Array.from(allDbCusts);
+
+        const dbCustsByDist = {};
+        resultData.forEach((r) => {
+          if (!r.dist || !r.cust) return;
+          if (!dbCustsByDist[r.dist]) dbCustsByDist[r.dist] = new Set();
+          dbCustsByDist[r.dist].add(r.cust);
+        });
+
+        matcherResults = {};
+        const distEntries = Object.entries(dbCustsByDist);
+
+        // Process one distributor at a time, yield between each to keep UI responsive
+        for (const [dist, custSet] of distEntries) {
+          const rows = [];
+          const custArr = Array.from(custSet);
+
+          // Process customers in chunks of 50 within each distributor
+          const CHUNK = 50;
+          for (let ci = 0; ci < custArr.length; ci += CHUNK) {
+            const chunk = custArr.slice(ci, ci + CHUNK);
+            chunk.forEach((dbCust) => {
+              const m = findBestCustMatch(
+                dbCust,
+                roCusts.filter((c) => c !== dbCust),
+              );
+              const exactInRo = roCusts.includes(dbCust);
+              if (exactInRo)
+                rows.push({ dbCust, roCust: dbCust, score: 100, exact: true });
+              else if (m)
+                rows.push({
+                  dbCust,
+                  roCust: m.name,
+                  score: m.score,
+                  exact: false,
+                });
+              else rows.push({ dbCust, roCust: null, score: 0, exact: false });
+            });
+            // Yield after each chunk
+            await new Promise((r) => setTimeout(r, 0));
+          }
+
+          rows.sort((a, b) => a.score - b.score);
+          matcherResults[dist] = rows;
+
+          // Callback so UI can update progressively as each dist finishes
+          if (onDistDone) onDistDone(dist, rows);
+        }
+        _matcherBuilding = false;
       }
 
       // RO customers extracted from template file (Sheet1 content or data sheet customers)
       let tplROCustomers = [];
 
       function renderMatcherDistGrid() {
-        buildMatcherResults();
+        _renderMatcherDistGridAsync();
+      }
+
+      async function _renderMatcherDistGridAsync() {
         const el = $("matcher-dist-grid");
-        const dists = Object.keys(matcherResults);
-        if (dists.length === 0) {
+
+        // Show skeleton immediately
+        el.innerHTML = `<div class="matcher-loading">
+          <span class="matcher-spinner"></span>
+          <span style="font-size:12px;color:var(--text2)">Menghitung kecocokan customer…</span>
+        </div>`;
+
+        // Run async matching, update grid progressively as each distributor finishes
+        const distOrderArr = [];
+        await buildMatcherResultsAsync((dist, rows) => {
+          distOrderArr.push(dist);
+          // Re-render grid with what we have so far
+          _paintDistGrid(el, distOrderArr);
+        });
+
+        if (distOrderArr.length === 0) {
           el.innerHTML =
             '<div style="font-size:13px; color:var(--text3)">Data belum diproses atau tidak ada distributor.</div>';
           return;
         }
-        el.innerHTML = dists
-          .map((dist) => {
-            const rows = matcherResults[dist] || [];
-            const lowConf = rows.filter((r) => !r.exact && r.score < 70).length;
-            const isOk = lowConf === 0;
-            const active = dist === matcherCurrentDist ? " active" : "";
-            const okCls = isOk ? " ok" : "";
-            return `<button class="mdist-btn${active}${okCls}" onclick="selectMatcherDist('${esc(dist)}')">${esc(dist)}<span class="mdist-badge">${lowConf > 0 ? lowConf + " ⚠" : "✓"}</span></button>`;
-          })
-          .join("");
 
-        if (!matcherCurrentDist && dists.length > 0)
-          selectMatcherDist(dists[0]);
+        // Final render
+        _paintDistGrid(el, distOrderArr);
+
+        // Auto-select first dist if none selected
+        if (!matcherCurrentDist && distOrderArr.length > 0) {
+          selectMatcherDist(distOrderArr[0]);
+        }
+      }
+
+      function _paintDistGrid(el, dists) {
+        const frag = document.createDocumentFragment();
+        dists.forEach((dist) => {
+          const rows = matcherResults[dist] || [];
+          const lowConf = rows.filter((r) => !r.exact && r.score < 70).length;
+          const isOk = lowConf === 0;
+          const active = dist === matcherCurrentDist ? " active" : "";
+          const okCls = isOk ? " ok" : "";
+          const btn = document.createElement("button");
+          btn.className = `mdist-btn${active}${okCls}`;
+          btn.onclick = () => selectMatcherDist(dist);
+          btn.innerHTML = `${esc(dist)}<span class="mdist-badge">${lowConf > 0 ? lowConf + " ⚠" : "✓"}</span>`;
+          frag.appendChild(btn);
+        });
+        el.innerHTML = "";
+        el.appendChild(frag);
       }
 
       function selectMatcherDist(dist) {
         matcherCurrentDist = dist;
-        renderMatcherDistGrid();
+        // Only repaint the grid highlight, don't re-run full async build
+        const el = $("matcher-dist-grid");
+        el.querySelectorAll(".mdist-btn").forEach((btn) => {
+          btn.classList.toggle("active", btn.textContent.startsWith(dist));
+        });
         renderMatcherTable(dist);
       }
 
-      function renderMatcherTable(dist) {
+      async function renderMatcherTable(dist) {
         const rows = matcherResults[dist] || [];
         const wrap = $("matcher-table-wrap");
+
         if (!rows.length) {
-          wrap.innerHTML =
-            '<div style="font-size:13px;color:var(--text3);text-align:center;padding:1.5rem 0">Tidak ada customer untuk distributor ini.</div>';
+          // Could be still computing — show skeleton if matcherResults[dist] is undefined
+          if (matcherResults[dist] === undefined && _matcherBuilding) {
+            wrap.innerHTML = `<div class="matcher-loading" style="padding:2rem 0">
+              <span class="matcher-spinner"></span>
+              <span style="font-size:13px;color:var(--text2)">Menghitung data distributor ini…</span>
+            </div>`;
+          } else {
+            wrap.innerHTML =
+              '<div style="font-size:13px;color:var(--text3);text-align:center;padding:1.5rem 0">Tidak ada customer untuk distributor ini.</div>';
+          }
           return;
         }
+
+        // Show skeleton while building table
+        wrap.innerHTML = `<div class="matcher-loading" style="padding:1.5rem 0">
+          <span class="matcher-spinner"></span>
+          <span style="font-size:13px;color:var(--text2)">Menyusun tabel ${rows.length} customer…</span>
+        </div>`;
+
         const allDbCusts = new Set(resultData.map((r) => r.cust));
         const roCusts =
           tplROCustomers.length > 0 ? tplROCustomers : Array.from(allDbCusts);
-
         const overrides = custOverrides[dist] || {};
         const lowCount = rows.filter((r) => !r.exact && r.score < 70).length;
         $("matcher-status").textContent =
           `${dist} — ${rows.length} customer, ${lowCount} perlu review`;
 
-        let html = `<div class="match-tbl-wrap"><table class="mtbl">
-          <thead><tr>
-            <th>#</th>
-            <th>Nama Customer (DB)</th>
-            <th>Confidence</th>
-            <th>Best Match (Template / DB lain)</th>
-            <th>Override Manual</th>
-          </tr></thead><tbody>`;
+        // Build table in chunks via rAF to avoid blocking
+        const CHUNK = 30;
+        const tableWrap = document.createElement("div");
+        tableWrap.className = "match-tbl-wrap";
+        const table = document.createElement("table");
+        table.className = "mtbl";
+        table.innerHTML = `<thead><tr>
+          <th>#</th>
+          <th>Nama Customer (DB)</th>
+          <th>Confidence</th>
+          <th>Best Match (Template / DB lain)</th>
+          <th>Override Manual</th>
+        </tr></thead>`;
+        const tbody = document.createElement("tbody");
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
 
-        rows.forEach((r, i) => {
-          const override = overrides[r.dbCust];
-          const confPct = r.score;
-          const confCls = confPct >= 80 ? "" : confPct >= 50 ? "med" : "low";
-          const pillCls = r.exact
-            ? "sp-matched"
-            : confPct >= 80
-              ? "sp-matched"
-              : confPct >= 50
-                ? "sp-med"
-                : "sp-low";
-          const barW = Math.max(confPct, 4);
+        // Pre-build options string once, reuse for all rows (major perf win)
+        const baseOpts = ["— Gunakan nama DB asli —", ...roCusts]
+          .map((c) => `<option value="${esc(c)}">${esc(c)}</option>`)
+          .join("");
 
-          const matchDisplay = r.exact
-            ? `<span class="ro-cust-badge sp-matched" title="Nama persis sama">= Exact Match</span>`
-            : r.roCust
-              ? `<span class="ro-cust-badge ${pillCls}" title="${esc(r.roCust)}">${esc(r.roCust.length > 28 ? r.roCust.slice(0, 28) + "…" : r.roCust)}</span>`
-              : `<span class="ro-cust-badge sp-low">— tidak ada kandidat —</span>`;
+        const buildRows = async () => {
+          for (let i = 0; i < rows.length; i += CHUNK) {
+            const chunk = rows.slice(i, i + CHUNK);
+            const frag = document.createDocumentFragment();
+            chunk.forEach((r, ci) => {
+              const rowIdx = i + ci;
+              const override = overrides[r.dbCust];
+              const confPct = r.score;
+              const confCls =
+                confPct >= 80 ? "" : confPct >= 50 ? "med" : "low";
+              const pillCls = r.exact
+                ? "sp-matched"
+                : confPct >= 80
+                  ? "sp-matched"
+                  : confPct >= 50
+                    ? "sp-med"
+                    : "sp-low";
+              const barW = Math.max(confPct, 4);
 
-          // Build select options
-          const opts = ["— Gunakan nama DB asli —", ...roCusts]
-            .map(
-              (c) =>
-                `<option value="${esc(c)}" ${override === c || (!override && c === r.roCust && !r.exact) ? "selected" : ""}>${esc(c)}</option>`,
-            )
-            .join("");
-          const selChanged =
-            override && override !== r.roCust ? " changed" : "";
+              const tr = document.createElement("tr");
 
-          html += `<tr>
-            <td style="color:var(--text3);width:32px">${i + 1}</td>
-            <td class="sku-cell">${esc(r.dbCust)}</td>
-            <td style="min-width:120px">
-              ${
-                r.exact
-                  ? '<span style="font-size:12px;color:var(--green);font-weight:500">100% exact</span>'
-                  : `
-              <div class="conf-bar">
-                <div class="conf-fill ${confCls}" style="width:${barW}px; min-width:4px; max-width:80px"></div>
-                <span class="conf-pct">${confPct}%</span>
-              </div>`
+              // Col 1: index
+              const td1 = document.createElement("td");
+              td1.style.cssText = "color:var(--text3);width:32px";
+              td1.textContent = rowIdx + 1;
+
+              // Col 2: DB name
+              const td2 = document.createElement("td");
+              td2.className = "sku-cell";
+              td2.textContent = r.dbCust;
+
+              // Col 3: confidence bar
+              const td3 = document.createElement("td");
+              td3.style.minWidth = "120px";
+              if (r.exact) {
+                td3.innerHTML =
+                  '<span style="font-size:12px;color:var(--green);font-weight:500">100% exact</span>';
+              } else {
+                td3.innerHTML = `<div class="conf-bar">
+                  <div class="conf-fill ${confCls}" style="width:${barW}px;min-width:4px;max-width:80px"></div>
+                  <span class="conf-pct">${confPct}%</span>
+                </div>`;
               }
-            </td>
-            <td>${matchDisplay}</td>
-            <td>
-              ${
-                r.exact
-                  ? '<span style="font-size:12px;color:var(--text3)">—</span>'
-                  : `<select class="match-sel${selChanged}" data-dist="${esc(dist)}" data-cust="${esc(r.dbCust)}" onchange="onMatchOverride(this)">${opts}</select>`
+
+              // Col 4: best match display
+              const td4 = document.createElement("td");
+              if (r.exact) {
+                td4.innerHTML =
+                  '<span class="ro-cust-badge sp-matched" title="Nama persis sama">= Exact Match</span>';
+              } else if (r.roCust) {
+                const label =
+                  r.roCust.length > 28 ? r.roCust.slice(0, 28) + "…" : r.roCust;
+                td4.innerHTML = `<span class="ro-cust-badge ${pillCls}" title="${esc(r.roCust)}">${esc(label)}</span>`;
+              } else {
+                td4.innerHTML =
+                  '<span class="ro-cust-badge sp-low">— tidak ada kandidat —</span>';
               }
-            </td>
-          </tr>`;
-        });
-        html += "</tbody></table></div>";
-        wrap.innerHTML = html;
+
+              // Col 5: override select — reuse baseOpts, patch selected attribute only
+              const td5 = document.createElement("td");
+              if (r.exact) {
+                td5.innerHTML =
+                  '<span style="font-size:12px;color:var(--text3)">—</span>';
+              } else {
+                // Inject baseOpts into a temp div, then patch selected
+                const sel = document.createElement("select");
+                sel.className =
+                  "match-sel" +
+                  (override && override !== r.roCust ? " changed" : "");
+                sel.dataset.dist = dist;
+                sel.dataset.cust = r.dbCust;
+                sel.innerHTML = baseOpts;
+                // Set selected option efficiently
+                const targetVal =
+                  override ||
+                  (r.roCust && !r.exact
+                    ? r.roCust
+                    : "— Gunakan nama DB asli —");
+                for (const opt of sel.options) {
+                  if (opt.value === targetVal) {
+                    opt.selected = true;
+                    break;
+                  }
+                }
+                sel.addEventListener("change", function () {
+                  onMatchOverride(this);
+                });
+                td5.appendChild(sel);
+              }
+
+              tr.appendChild(td1);
+              tr.appendChild(td2);
+              tr.appendChild(td3);
+              tr.appendChild(td4);
+              tr.appendChild(td5);
+              frag.appendChild(tr);
+            });
+            tbody.appendChild(frag);
+            // Yield between chunks so page stays responsive
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        };
+
+        // Swap skeleton → real table after first rAF, then populate
+        await new Promise((r) => requestAnimationFrame(r));
+        wrap.innerHTML = "";
+        wrap.appendChild(tableWrap);
+        await buildRows();
       }
 
       function onMatchOverride(sel) {
@@ -2788,8 +2975,9 @@
         custOverrides = {};
         matcherResults = {};
         matcherCurrentDist = null;
-        buildMatcherResults();
-        renderMatcherDistGrid();
+        // Rebuild async — don't block here
+        _matcherBuilding = false;
+        _renderMatcherDistGridAsync();
         alert(`✓ ${applied} baris berhasil dikoreksi nama customernya.`);
         $("matcher-status").textContent = `${applied} baris dikoreksi.`;
         updateFabBadge();

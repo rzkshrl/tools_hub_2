@@ -693,24 +693,65 @@ body {
 .section {
   animation: fadeIn 0.2s ease;
 }
+/* ── Skeleton & async loading states ── */
+.matcher-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1rem 0;
+  color: var(--text2);
+}
+.matcher-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.matcher-skeleton {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-line {
+  height: 14px;
+  background: linear-gradient(
+    90deg,
+    var(--surface2) 25%,
+    var(--border) 50%,
+    var(--surface2) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 .ti-loader {
   display: inline-block;
   animation: spin 1s linear infinite;
+}
+from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+to {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Reset hint */
