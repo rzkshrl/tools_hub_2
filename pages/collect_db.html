@@ -3855,14 +3855,37 @@
         const ws = wb2.Sheets[mapping.dbSheetName];
         if (!ws) return _origDetectAndExtractWithNorm(wb2, fileName);
 
-        const data = XLSX.utils.sheet_to_json(ws, {
+        // Only read columns we actually need (avoids deserializing huge unused columns)
+        const colMap = mapping.colMap;
+        const neededCols = new Set(
+          Object.values(colMap).filter((v) => typeof v === "number" && v >= 0)
+        );
+
+        // Clip sheet's column range to max needed column to skip deserializing wide sheets
+        let clippedWs = ws;
+        if (ws["!ref"] && neededCols.size > 0) {
+          try {
+            const maxCol = Math.max(...neededCols);
+            const fullRange = XLSX.utils.decode_range(ws["!ref"]);
+            if (fullRange.e.c > maxCol + 2) {
+              // Clip to maxCol + small buffer
+              clippedWs = Object.assign({}, ws, {
+                "!ref": XLSX.utils.encode_range({
+                  s: fullRange.s,
+                  e: { r: fullRange.e.r, c: maxCol + 1 },
+                }),
+              });
+            }
+          } catch (_) { /* use original ws */ }
+        }
+
+        const data = XLSX.utils.sheet_to_json(clippedWs, {
           header: 1,
           defval: null,
           raw: true,
           cellDates: true,
         });
         const startRow = mapping.hdrRow + 1;
-        const colMap = mapping.colMap;
         const col = (row, idx) =>
           idx >= 0 && idx < row.length ? row[idx] : null;
         const str = (v) => (v == null ? "" : String(v).trim());
@@ -3928,16 +3951,16 @@
               return;
             }
             const m = entries[i];
-            // Update progress via rAF to avoid forced reflow every iteration
-            const pct = (i / entries.length) * 90;
-            setProgress(pct, `Memproses: ${m.shortName}`);
+            // Show progress BEFORE parse so user sees movement immediately
+            const pct = (i / entries.length) * 85;
+            setProgress(pct, `Memproses: ${m.shortName} (${i + 1}/${entries.length})`);
             document.getElementById("process-sub").textContent =
               `Memproses file ${i + 1} dari ${entries.length}...`;
+            // Yield BEFORE every parse so the progress update renders first
+            await new Promise((r) => setTimeout(r, 0));
             try {
               const ab = zipFileCache[m.shortName];
               if (!ab) throw new Error("Cache tidak ditemukan");
-              // Parse XLSX — CPU bound; wrap in microtask yield before each parse
-              await new Promise((r) => setTimeout(r, 0));
               const wb2 = XLSX.read(ab, {
                 type: "array",
                 cellDates: true,
@@ -3961,8 +3984,10 @@
               log(`✗ ${m.shortName}: ${e.message}`, "err");
               errors.push({ name: m.shortName, reason: e.message });
             }
-            // Extra yield every 3 files to keep page painting
-            if (i % 3 === 2) await new Promise((r) => setTimeout(r, 10));
+            // Update progress AFTER parse completes so bar moves forward per file
+            setProgress(((i + 1) / entries.length) * 85, `✓ ${m.shortName}`);
+            // Extra yield every 2 files to keep page painting
+            if (i % 2 === 1) await new Promise((r) => setTimeout(r, 8));
           }
 
           // Also handle DB files with errors in mapping phase
@@ -3973,13 +3998,30 @@
             });
 
           if (cancelled) return;
-          setProgress(100, "Selesai!");
-          $("matcher-fab").classList.remove("hidden");
-          buildMatcherResults();
-          updateFabBadge();
+
+          // Post-processing steps — show progress so user knows we're still working
+          setProgress(88, "Menyusun hasil...");
+          document.getElementById("process-sub").textContent = "Menyusun ringkasan...";
+          await new Promise((r) => setTimeout(r, 0));
+
           showResults(
             entries.length + dbMappings.filter((m) => m.error).length,
           );
+
+          setProgress(93, "Menghitung kecocokan customer...");
+          document.getElementById("process-sub").textContent = "Analisis nama customer...";
+          await new Promise((r) => setTimeout(r, 0));
+
+          $("matcher-fab").classList.remove("hidden");
+          // Use async version so it doesn't block the thread
+          buildMatcherResultsAsync((dist) => {
+            updateFabBadge();
+          }).then(() => {
+            updateFabBadge();
+          });
+
+          setProgress(100, "Selesai!");
+          document.getElementById("process-sub").textContent = "Semua file berhasil diproses.";
         } else {
           // fallback: no mapping done, use original processing
           return _origStartProcessing();
