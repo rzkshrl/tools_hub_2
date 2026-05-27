@@ -11,75 +11,6 @@
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
     />
     <link rel="stylesheet" href="/assets/css/style_collect_db.css" />
-    <style>
-      /* RO Output Config chips */
-      .ro-field-chip,
-      .ro-val-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 5px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        border: 1.5px solid var(--border);
-        background: var(--surface2);
-        color: var(--text2);
-        transition:
-          border-color 0.15s,
-          background 0.15s,
-          color 0.15s;
-        user-select: none;
-      }
-      .ro-field-chip:has(input:checked),
-      .ro-val-chip:has(input:checked) {
-        border-color: var(--blue);
-        background: color-mix(in srgb, var(--blue) 12%, var(--surface2));
-        color: var(--blue);
-      }
-      .ro-field-chip input,
-      .ro-val-chip input {
-        display: none;
-      }
-      .ro-month-label-row {
-        display: grid;
-        grid-template-columns: 120px 1fr;
-        gap: 8px;
-        align-items: center;
-      }
-      .ro-month-label-row label {
-        font-size: 12px;
-        color: var(--text2);
-        font-weight: 500;
-      }
-      .ro-month-label-row input[type="text"] {
-        padding: 4px 9px;
-        border-radius: 6px;
-        border: 1.5px solid var(--border);
-        background: var(--surface2);
-        color: var(--text);
-        font-size: 12px;
-        width: 100%;
-        outline: none;
-        transition: border-color 0.15s;
-      }
-      .ro-field-chip.ro-field-unavail,
-      .ro-val-chip.ro-field-unavail {
-        opacity: 0.45;
-        cursor: not-allowed;
-        border-style: dashed;
-      }
-      .ro-val-chip {
-        align-items: flex-start;
-        padding: 8px 14px;
-      }
-      .ro-val-chip span {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-      }
-    </style>
   </head>
   <body>
     Í
@@ -107,11 +38,11 @@
         </div>
         <div class="step" id="step-2">
           <div class="step-num">2</div>
-          <span>Mapping DB</span>
+          <span>Format Output</span>
         </div>
         <div class="step" id="step-3">
           <div class="step-num">3</div>
-          <span>Format Output</span>
+          <span>Mapping DB</span>
         </div>
         <div class="step" id="step-4">
           <div class="step-num">4</div>
@@ -316,13 +247,11 @@
               <i class="ti ti-arrow-left"></i> Kembali
             </button>
             <button class="btn btn-primary" id="btn-next-map">
-              Lanjut ke Format Output <i class="ti ti-arrow-right"></i>
+              Lanjut ke Periode &amp; Kolom <i class="ti ti-arrow-right"></i>
             </button>
           </div>
         </div>
       </div>
-
-      <!-- ══════════════ SECTION 2b: Format Output RO ══════════════ -->
       <div id="sec-format" class="section hidden">
         <div class="card">
           <div class="card-title">
@@ -428,7 +357,145 @@
         </div>
       </div>
 
-      <!-- ══════════════ SECTION 2: Period & Column config ══════════════ -->
+      <!-- ══════════════ SECTION 2: Format Output RO ══════════════ -->
+      <div id="sec-format" class="section hidden">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-layout-columns" aria-hidden="true"></i>
+            Format Output RO
+          </div>
+          <div class="card-sub">
+            Tentukan kolom baris dan nilai per bulan untuk tabel output setiap
+            distributor.
+            <strong>Kolom baris</strong> dibaca dari sheet template yang
+            diupload. <strong>Nilai per bulan</strong> bebas dipilih sesuai
+            kolom yang paling banyak ada di file DB.
+          </div>
+
+          <!-- Row dimension: from template sheet -->
+          <div style="margin-bottom: 1.5rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              "
+            >
+              <i
+                class="ti ti-columns"
+                style="color: var(--blue); font-size: 14px"
+              ></i>
+              Kolom baris yang ditampilkan
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Kolom ini diambil dari header sheet template RO kamu. Centang yang
+              ingin muncul sebagai dimensi baris.
+              <strong>Nama Customer</strong> selalu wajib ada.
+            </div>
+            <div
+              id="fmt-row-fields"
+              style="display: flex; flex-wrap: wrap; gap: 8px"
+            ></div>
+            <div
+              id="fmt-row-hint"
+              style="
+                font-size: 11px;
+                color: var(--text3);
+                margin-top: 8px;
+                font-style: italic;
+              "
+            ></div>
+          </div>
+
+          <!-- Value field: detect from DB files scanned -->
+          <div style="margin-bottom: 1.5rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              "
+            >
+              <i
+                class="ti ti-hash"
+                style="color: var(--blue); font-size: 14px"
+              ></i>
+              Nilai per bulan
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Pilih kolom angka yang dipakai sebagai isi tabel. Semua pilihan
+              dideteksi otomatis dari file DB — semakin tinggi %, semakin banyak
+              DB yang punya kolom tersebut.
+            </div>
+            <div
+              id="fmt-value-fields"
+              style="display: flex; flex-wrap: wrap; gap: 8px"
+            ></div>
+          </div>
+
+          <!-- Month label customization -->
+          <div id="fmt-month-label-section" style="margin-bottom: 1.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              "
+            >
+              <i
+                class="ti ti-tag"
+                style="color: var(--blue); font-size: 14px"
+              ></i>
+              Label kolom bulan
+              <em style="font-size: 11px; font-weight: 400; color: var(--text3)"
+                >(opsional)</em
+              >
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Ganti nama header setiap kolom bulan — misal "April" → "RO April".
+              Biarkan kosong untuk pakai nama default.
+            </div>
+            <div
+              id="fmt-month-labels"
+              style="display: flex; flex-direction: column; gap: 6px"
+            >
+              <div
+                style="font-size: 12px; color: var(--text3); font-style: italic"
+              >
+                Atur periode di langkah berikutnya — label bulan bisa diubah di
+                sini setelah kembali.
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn" id="btn-back-format">
+              <i class="ti ti-arrow-left"></i> Kembali
+            </button>
+            <button class="btn btn-primary" id="btn-next-format">
+              Lanjut ke Mapping DB <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
       <div id="sec-columns" class="section hidden">
         <!-- Periode RO -->
         <div class="period-card">
@@ -854,6 +921,7 @@
 
       // Template state
       let tplFile = null;
+      let tplWb = null; // parsed template workbook, set when Format Output is opened
       let tplDistOrder = [];
       let tplMonths = [];
       let tplDataSheetName = null;
@@ -1382,31 +1450,78 @@
       // ════════════════════════════════════════════════════════════
       //  NAV
       // ════════════════════════════════════════════════════════════
-      $("btn-next-1").addEventListener("click", () => {
+      $("btn-next-1").addEventListener("click", async () => {
         setStep(2);
-        showSection("mapping");
-        buildDBMapping();
-      });
-
-      $("btn-back-map").addEventListener("click", () => {
-        setStep(1);
-        showSection("upload");
-      });
-
-      $("btn-next-map").addEventListener("click", () => {
-        setStep(3);
         showSection("format");
+
+        // Parse template workbook for row-field detection (non-blocking)
+        tplWb = null;
+        if (tplFile) {
+          try {
+            const ab = await tplFile.arrayBuffer();
+            tplWb = XLSX.read(ab, { type: "array", raw: true, bookVBA: false });
+          } catch (_) {
+            tplWb = null;
+          }
+        }
+
+        // Pre-scan ZIP for value column detection (read only headers, sheetRows:5)
+        if (zipFile && Object.keys(zipFileCache).length === 0) {
+          try {
+            const zip = await JSZip.loadAsync(zipFile);
+            const xlsxFiles = Object.keys(zip.files).filter(
+              (n) =>
+                n.match(/\.xlsx$/i) &&
+                !zip.files[n].dir &&
+                !n.includes("~$") &&
+                selectedDBs.has(
+                  n.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, ""),
+                ),
+            );
+            for (const name of xlsxFiles) {
+              const ab = await zip.files[name].async("arraybuffer");
+              const shortName = name
+                .replace(/^.*[\\\/]/, "")
+                .replace(/\.xlsx$/i, "");
+              zipFileCache[shortName] = ab;
+              await new Promise((r) => setTimeout(r, 0));
+            }
+          } catch (_) {
+            /* ok, will be retried in buildDBMapping */
+          }
+        }
+
         buildFormatSection();
       });
 
       $("btn-back-format").addEventListener("click", () => {
-        setStep(2);
-        showSection("mapping");
+        setStep(1);
+        showSection("upload");
       });
 
       $("btn-next-format").addEventListener("click", () => {
+        // Validate value field chosen
+        if (!roOutputConfig.valueField) {
+          alert("Pilih nilai per bulan terlebih dahulu.");
+          return;
+        }
+        setStep(3);
+        showSection("mapping");
+        document.querySelector(".app").classList.add("wide");
+        buildDBMapping();
+      });
+
+      $("btn-back-map").addEventListener("click", () => {
+        setStep(2);
+        showSection("format");
+        document.querySelector(".app").classList.remove("wide");
+        buildFormatSection();
+      });
+
+      $("btn-next-map").addEventListener("click", () => {
         setStep(4);
         showSection("columns");
+        document.querySelector(".app").classList.remove("wide");
         updateModePills();
         renderCols();
         renderMonthChips();
@@ -1414,9 +1529,8 @@
 
       $("btn-back-1").addEventListener("click", () => {
         setStep(3);
-        showSection("format");
-        // Re-render month labels in format section now that period may have been set
-        renderFmtMonthLabels();
+        showSection("mapping");
+        document.querySelector(".app").classList.add("wide");
       });
 
       $("btn-next-2").addEventListener("click", () => {
@@ -1436,72 +1550,276 @@
       });
 
       // ════════════════════════════════════════════════════════════
-      //  FORMAT OUTPUT SECTION — Step 3
-      //  Dynamically builds row-field and value-field choices
-      //  based on what columns were actually detected across all DBs
+      //  FORMAT OUTPUT SECTION — Step 2
+      //  Row fields: from template sheet header
+      //  Value fields: from most-common numeric columns across DB files
       // ════════════════════════════════════════════════════════════
 
-      // Slot definitions: which slots can be row-dimensions, which are values
-      const FMT_ROW_SLOTS = [
+      // Known row-dimension slot candidates — matched against template headers
+      const ROW_SLOT_CANDIDATES = [
         {
           id: "dist",
+          aliases: [
+            "distributor",
+            "nama db",
+            "db",
+            "kode db",
+            "nama distributor",
+            "dist",
+          ],
           label: "Nama DB / Distributor",
           icon: "ti-building-store",
           always: false,
-          sourceKey: null,
         },
         {
           id: "salesman",
+          aliases: [
+            "salesman",
+            "sales",
+            "nama salesman",
+            "nama sales",
+            "sales name",
+            "sman",
+          ],
           label: "Nama Salesman",
           icon: "ti-user",
           always: false,
-          sourceKey: "salesman",
         },
         {
           id: "cust",
+          aliases: [
+            "customer",
+            "nama customer",
+            "pelanggan",
+            "nama pelanggan",
+            "outlet",
+            "nama outlet",
+            "toko",
+            "nama toko",
+          ],
           label: "Nama Customer",
           icon: "ti-user-circle",
           always: true,
-          sourceKey: "cust",
+        },
+        {
+          id: "barang",
+          aliases: [
+            "barang",
+            "nama barang",
+            "produk",
+            "nama produk",
+            "item",
+            "nama item",
+            "kode barang",
+          ],
+          label: "Nama Barang",
+          icon: "ti-package",
+          always: false,
         },
       ];
-      const FMT_VALUE_SLOTS = [
+
+      // Value slot candidates — shown in "nilai per bulan"
+      const VALUE_SLOT_CANDIDATES = [
         {
           id: "qty",
-          label: "QTY (Kuantitas)",
-          desc: "Jumlah unit/karton per bulan",
-          sourceKey: "qty",
+          aliases: [
+            "qty",
+            "quantity",
+            "kuantitas",
+            "jml",
+            "jumlah barang",
+            "jlh",
+            "unit",
+            "pcs",
+            "karton",
+            "ktn",
+            "dus",
+          ],
+          label: "QTY / Kuantitas",
+          desc: "Jumlah unit/karton",
         },
         {
           id: "jumlah",
+          aliases: [
+            "jumlah",
+            "nilai",
+            "dpp",
+            "neto",
+            "net amount",
+            "amount",
+            "harga jual",
+            "total harga",
+            "subtotal",
+            "total",
+            "jumlah rupiah",
+            "nilai retur",
+          ],
           label: "DPP / Jumlah Rupiah",
-          desc: "Nilai rupiah (neto/DPP) per bulan",
-          sourceKey: "jumlah",
+          desc: "Nilai rupiah (neto/DPP)",
+        },
+        {
+          id: "satuan",
+          aliases: ["satuan", "uom", "unit of measure", "kemasan", "pack"],
+          label: "Satuan",
+          desc: "Kemasan/UoM",
         },
       ];
 
-      function buildFormatSection() {
-        // Tally which colMap slots are detected (>= 0) across how many DBs
-        const slotCount = {}; // slotKey → count of DBs that have it
-        COL_SLOTS.forEach((s) => {
-          slotCount[s] = 0;
-        });
-        dbMappings
-          .filter((m) => !m.error)
-          .forEach((m) => {
-            COL_SLOTS.forEach((s) => {
-              if (m.colMap[s] >= 0) slotCount[s]++;
-            });
-          });
-        const totalDBs = dbMappings.filter((m) => !m.error).length || 1;
+      // Detect which row-fields come from the template RO
+      function detectRowFieldsFromTemplate() {
+        // tplWb is the uploaded template workbook
+        // tplSheetNames are the sheet names; skip Sheet1 (raw data), use others
+        if (!tplWb) return [];
+        const dataSheets = tplWb.SheetNames.filter(
+          (n) => n.toLowerCase() !== "sheet1" && n.toLowerCase() !== "data",
+        );
+        if (dataSheets.length === 0) return [];
 
-        // ── Row fields ──
+        const found = new Set();
+        dataSheets.forEach((sheetName) => {
+          const ws = tplWb.Sheets[sheetName];
+          if (!ws || !ws["!ref"]) return;
+          const rows = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: null,
+            raw: true,
+          });
+          // Look through first 10 rows for header-like cells
+          const headerCandidates = rows
+            .slice(0, 10)
+            .flat()
+            .filter((v) => v && typeof v === "string")
+            .map((v) => v.toLowerCase().trim());
+
+          ROW_SLOT_CANDIDATES.forEach((slot) => {
+            if (slot.always) {
+              found.add(slot.id);
+              return;
+            }
+            if (
+              slot.aliases.some((a) =>
+                headerCandidates.some(
+                  (h) => h.includes(a) || a.includes(h.replace(/[\s_]/g, "")),
+                ),
+              )
+            ) {
+              found.add(slot.id);
+            }
+          });
+        });
+        return found;
+      }
+
+      // Scan DB files already loaded in zipFileCache to find most common value columns
+      function detectValueColumnsFromDB() {
+        // Returns array of {id, label, desc, count, pct, colNames}
+        const tally = {}; // id → {count, names: Set}
+        VALUE_SLOT_CANDIDATES.forEach((s) => {
+          tally[s.id] = { count: 0, names: new Set() };
+        });
+
+        const totalFiles = Object.keys(zipFileCache).length;
+        if (totalFiles === 0)
+          return VALUE_SLOT_CANDIDATES.map((s) => ({
+            ...s,
+            count: 0,
+            pct: 0,
+            colNames: [],
+          }));
+
+        Object.entries(zipFileCache).forEach(([shortName, ab]) => {
+          try {
+            const wb = XLSX.read(ab, {
+              type: "array",
+              raw: true,
+              bookSheets: false,
+              bookVBA: false,
+              sheetRows: 10,
+            });
+            // Try each sheet, use first with data
+            for (const sName of wb.SheetNames) {
+              const ws = wb.Sheets[sName];
+              if (!ws || !ws["!ref"]) continue;
+              const rows = XLSX.utils.sheet_to_json(ws, {
+                header: 1,
+                defval: null,
+                raw: true,
+                range: 0,
+              });
+              // Find header row: first row with 3+ non-empty string cells
+              const hdrRow = rows.findIndex(
+                (r) =>
+                  r && r.filter((v) => v && typeof v === "string").length >= 3,
+              );
+              if (hdrRow < 0) continue;
+              const hdrs = rows[hdrRow].map((v) =>
+                v ? String(v).toLowerCase().trim() : "",
+              );
+              VALUE_SLOT_CANDIDATES.forEach((slot) => {
+                const matchedHdr = slot.aliases.find((a) =>
+                  hdrs.some(
+                    (h) =>
+                      h === a ||
+                      h.includes(a) ||
+                      a.includes(h.replace(/[\s_]/g, "")),
+                  ),
+                );
+                if (matchedHdr) {
+                  tally[slot.id].count++;
+                  // Record actual column name found
+                  const realHdr =
+                    rows[hdrRow][
+                      hdrs.findIndex(
+                        (h) =>
+                          h === matchedHdr ||
+                          h.includes(matchedHdr) ||
+                          matchedHdr.includes(h.replace(/[\s_]/g, "")),
+                      )
+                    ];
+                  if (realHdr) tally[slot.id].names.add(String(realHdr).trim());
+                }
+              });
+              break; // only check first usable sheet
+            }
+          } catch (_) {
+            /* skip malformed */
+          }
+        });
+
+        return VALUE_SLOT_CANDIDATES.map((s) => ({
+          ...s,
+          count: tally[s.id].count,
+          pct: Math.round((tally[s.id].count / totalFiles) * 100),
+          colNames: [...tally[s.id].names].slice(0, 3),
+        }));
+      }
+
+      function buildFormatSection() {
+        // ── Row fields from template ──
         const rowWrap = $("fmt-row-fields");
+        const rowHint = $("fmt-row-hint");
         rowWrap.innerHTML = "";
-        FMT_ROW_SLOTS.forEach((slot) => {
-          const count = slot.sourceKey ? slotCount[slot.sourceKey] : totalDBs; // dist always "available"
-          const pct = Math.round((count / totalDBs) * 100);
-          const available = slot.always || count > 0;
+
+        const foundInTemplate = detectRowFieldsFromTemplate();
+        const hasTemplate =
+          tplWb &&
+          tplWb.SheetNames.filter(
+            (n) => n.toLowerCase() !== "sheet1" && n.toLowerCase() !== "data",
+          ).length > 0;
+
+        if (hasTemplate && foundInTemplate.size === 0) {
+          rowHint.textContent =
+            "Template diupload tapi tidak ditemukan kolom yang dikenali — semua pilihan ditampilkan.";
+        } else if (!hasTemplate) {
+          rowHint.textContent =
+            "Tidak ada template RO — semua pilihan ditampilkan. Upload template di langkah pertama untuk deteksi otomatis.";
+        } else {
+          rowHint.textContent = `Kolom terdeteksi dari sheet template: ${[...foundInTemplate].join(", ")}`;
+        }
+
+        ROW_SLOT_CANDIDATES.forEach((slot) => {
+          const available =
+            slot.always || !hasTemplate || foundInTemplate.has(slot.id);
           const isChecked = roOutputConfig.rowFields.includes(slot.id);
 
           const chip = document.createElement("label");
@@ -1512,15 +1830,17 @@
           chip.title = slot.always
             ? "Wajib ada"
             : available
-              ? `Terdeteksi di ${count}/${totalDBs} file DB (${pct}%)`
-              : "Tidak terdeteksi di file DB manapun";
+              ? "Ditemukan di template RO"
+              : "Tidak ditemukan di sheet template";
           chip.innerHTML = `
-            <input type="checkbox" data-field="${slot.id}" ${isChecked ? "checked" : ""} ${slot.always ? "disabled" : !available ? "disabled" : ""}>
+            <input type="checkbox" data-field="${slot.id}"
+              ${isChecked ? "checked" : ""}
+              ${slot.always || !available ? "disabled" : ""}>
             <i class="ti ${slot.icon}" style="font-size:13px"></i>
             ${slot.label}
             ${slot.always ? '<em style="font-size:10px;color:var(--text3);margin-left:2px">(wajib)</em>' : ""}
-            ${!slot.always && available ? `<span style="font-size:10px;color:var(--text3);margin-left:2px">${pct}% DB</span>` : ""}
-            ${!available ? '<span style="font-size:10px;color:var(--red);margin-left:2px">tidak ada</span>' : ""}
+            ${!slot.always && available ? '<i class="ti ti-check" style="font-size:10px;color:var(--green);margin-left:2px"></i>' : ""}
+            ${!slot.always && !available ? '<span style="font-size:10px;color:var(--text3);margin-left:2px;font-style:italic">tidak di template</span>' : ""}
           `;
           const cb = chip.querySelector("input");
           cb.addEventListener("change", () => {
@@ -1536,37 +1856,44 @@
           rowWrap.appendChild(chip);
         });
 
-        // ── Value fields ──
+        // ── Value fields from DB scan ──
         const valWrap = $("fmt-value-fields");
         valWrap.innerHTML = "";
-        FMT_VALUE_SLOTS.forEach((slot) => {
-          const count = slotCount[slot.sourceKey] || 0;
-          const pct = Math.round((count / totalDBs) * 100);
-          const available = count > 0;
-          const isSelected = roOutputConfig.valueField === slot.id;
 
-          const chip = document.createElement("label");
-          chip.className =
-            "ro-val-chip" + (!available ? " ro-field-unavail" : "");
-          chip.title = available
-            ? `Terdeteksi di ${count}/${totalDBs} file DB (${pct}%)`
-            : "Tidak terdeteksi di file DB manapun";
-          chip.innerHTML = `
-            <input type="radio" name="ro-val-fmt" value="${slot.id}" ${isSelected ? "checked" : ""} ${!available ? "disabled" : ""}>
-            <span>
-              <strong style="display:block;font-size:12px">${slot.label}</strong>
-              <span style="font-size:11px;color:var(--text3)">${slot.desc}</span>
-              ${available ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${pct}% DB</span>` : '<span style="font-size:10px;color:var(--red)">tidak ada data</span>'}
-            </span>
-          `;
-          const radio = chip.querySelector("input");
-          radio.addEventListener("change", () => {
-            if (radio.checked) roOutputConfig.valueField = slot.id;
-          });
-          valWrap.appendChild(chip);
-        });
+        const valueOptions = detectValueColumnsFromDB();
+        const hasAny = valueOptions.some((v) => v.count > 0);
 
-        // ── Month labels (if period already set) ──
+        if (!hasAny) {
+          valWrap.innerHTML =
+            '<div style="font-size:12px;color:var(--text3);font-style:italic;">Upload file ZIP terlebih dahulu untuk deteksi otomatis kolom nilai.</div>';
+        } else {
+          valueOptions
+            .filter((v) => v.count > 0)
+            .forEach((slot) => {
+              const isSelected = roOutputConfig.valueField === slot.id;
+              const chip = document.createElement("label");
+              chip.className = "ro-val-chip";
+              chip.title = `Ditemukan di ${slot.count} file DB (${slot.pct}%)`;
+              chip.innerHTML = `
+              <input type="radio" name="ro-val-fmt" value="${slot.id}" ${isSelected ? "checked" : ""}>
+              <span>
+                <strong style="display:block;font-size:12px;color:var(--text)">${slot.label}</strong>
+                <span style="font-size:11px;color:var(--text3)">${slot.desc}</span>
+                <span style="font-size:11px;color:var(--blue);margin-top:2px;display:block">
+                  ${slot.pct}% DB
+                  ${slot.colNames.length ? `<span style="color:var(--text3)"> · nama kolom: ${slot.colNames.map((n) => `<code style="background:var(--surface2);padding:1px 4px;border-radius:3px">${esc(n)}</code>`).join(", ")}</span>` : ""}
+                </span>
+              </span>
+            `;
+              const radio = chip.querySelector("input");
+              radio.addEventListener("change", () => {
+                if (radio.checked) roOutputConfig.valueField = slot.id;
+              });
+              valWrap.appendChild(chip);
+            });
+        }
+
+        // ── Month labels ──
         renderFmtMonthLabels();
       }
 
@@ -2757,6 +3084,7 @@
         custOverrides = {};
         matcherCurrentDist = null;
         tplROCustomers = [];
+        tplWb = null;
         roOutputConfig = {
           rowFields: ["cust"],
           valueField: "qty",
@@ -2764,6 +3092,7 @@
           monthLabelSuffix: "",
           customMonthLabels: {},
         };
+        document.querySelector(".app").classList.remove("wide");
         $("matcher-fab").classList.add("hidden");
         dbMappings = [];
         zipFileCache = {};
@@ -3762,14 +4091,21 @@
       // progress feedback, yields to UI between batches.
       async function buildDBMapping() {
         dbMappings = [];
-        zipFileCache = {};
+        // Reuse zipFileCache if already populated from Format Output pre-scan
+        const cacheAlreadyLoaded = Object.keys(zipFileCache).length > 0;
+        if (!cacheAlreadyLoaded) zipFileCache = {};
 
         // Get tpl sheet names (if template loaded)
         tplSheetNames = [];
         if (tplFile) {
-          const ab = await tplFile.arrayBuffer();
-          const wb = XLSX.read(ab, { type: "array", raw: true });
-          tplSheetNames = wb.SheetNames.filter((s) => s !== "Sheet1");
+          if (tplWb) {
+            // Already parsed in Format Output step — reuse
+            tplSheetNames = tplWb.SheetNames.filter((s) => s !== "Sheet1");
+          } else {
+            const ab = await tplFile.arrayBuffer();
+            tplWb = XLSX.read(ab, { type: "array", raw: true, bookVBA: false });
+            tplSheetNames = tplWb.SheetNames.filter((s) => s !== "Sheet1");
+          }
         }
 
         // Read ZIP and analyze each selected DB
@@ -3796,9 +4132,19 @@
         let doneCount = 0;
 
         // First, extract all ArrayBuffers in parallel batches (I/O bound)
+        // Skip files already in cache from Format Output pre-scan
         const absMap = {};
-        for (let i = 0; i < selectedFiles.length; i += BATCH) {
-          const batch = selectedFiles.slice(i, i + BATCH);
+        const filesToExtract = selectedFiles.filter((fp) => {
+          const sn = fp.replace(/^.*[\\\/]/, "").replace(/\.xlsx$/i, "");
+          if (zipFileCache[sn]) {
+            absMap[sn] = { fp, ab: zipFileCache[sn] };
+            return false;
+          }
+          return true;
+        });
+
+        for (let i = 0; i < filesToExtract.length; i += BATCH) {
+          const batch = filesToExtract.slice(i, i + BATCH);
           const results = await Promise.all(
             batch.map(async (fp) => {
               const ab = await zip.files[fp].async("arraybuffer");

@@ -1896,3 +1896,99 @@ table.mtbl tr:hover td {
   color: var(--text3);
   font-family: monospace;
 }
+/* Full-width layout for mapping step */
+.app.wide {
+  max-width: 100%;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+}
+.app.wide .card,
+.app.wide .period-card,
+.app.wide .map-card {
+  max-width: 100%;
+}
+.app.wide .steps {
+  max-width: 100%;
+}
+/* Mapping table: allow colmap-panel to be wider */
+.app.wide .colmap-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.app.wide .colmap-label {
+  width: 90px;
+}
+@media (max-width: 900px) {
+  .app.wide {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .app.wide .colmap-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.ro-field-chip,
+.ro-val-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+  user-select: none;
+}
+.ro-field-chip:has(input:checked),
+.ro-val-chip:has(input:checked) {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, var(--surface2));
+  color: var(--blue);
+}
+.ro-field-chip input,
+.ro-val-chip input {
+  display: none;
+}
+.ro-month-label-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.ro-month-label-row label {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.ro-month-label-row input[type="text"] {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ro-field-chip.ro-field-unavail,
+.ro-val-chip.ro-field-unavail {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.ro-val-chip {
+  align-items: flex-start;
+  padding: 8px 14px;
+}
+.ro-val-chip span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
