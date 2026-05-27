@@ -13,30 +13,72 @@
     <link rel="stylesheet" href="/assets/css/style_collect_db.css" />
     <style>
       /* RO Output Config chips */
-      .ro-field-chip, .ro-val-chip {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
-        cursor: pointer; border: 1.5px solid var(--border);
-        background: var(--surface2); color: var(--text2);
-        transition: border-color 0.15s, background 0.15s, color 0.15s;
+      .ro-field-chip,
+      .ro-val-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1.5px solid var(--border);
+        background: var(--surface2);
+        color: var(--text2);
+        transition:
+          border-color 0.15s,
+          background 0.15s,
+          color 0.15s;
         user-select: none;
       }
-      .ro-field-chip:has(input:checked), .ro-val-chip:has(input:checked) {
-        border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--surface2));
+      .ro-field-chip:has(input:checked),
+      .ro-val-chip:has(input:checked) {
+        border-color: var(--blue);
+        background: color-mix(in srgb, var(--blue) 12%, var(--surface2));
         color: var(--blue);
       }
-      .ro-field-chip input, .ro-val-chip input { display: none; }
+      .ro-field-chip input,
+      .ro-val-chip input {
+        display: none;
+      }
       .ro-month-label-row {
-        display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: center;
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 8px;
+        align-items: center;
       }
-      .ro-month-label-row label { font-size: 12px; color: var(--text2); font-weight: 500; }
-      .ro-month-label-row input[type=text] {
-        padding: 4px 9px; border-radius: 6px; border: 1.5px solid var(--border);
-        background: var(--surface2); color: var(--text); font-size: 12px;
-        width: 100%; outline: none; transition: border-color 0.15s;
+      .ro-month-label-row label {
+        font-size: 12px;
+        color: var(--text2);
+        font-weight: 500;
       }
-      .ro-month-label-row input[type=text]:focus { border-color: var(--blue); }
-      .ro-month-label-row input[type=text]::placeholder { color: var(--text3); }
+      .ro-month-label-row input[type="text"] {
+        padding: 4px 9px;
+        border-radius: 6px;
+        border: 1.5px solid var(--border);
+        background: var(--surface2);
+        color: var(--text);
+        font-size: 12px;
+        width: 100%;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .ro-field-chip.ro-field-unavail,
+      .ro-val-chip.ro-field-unavail {
+        opacity: 0.45;
+        cursor: not-allowed;
+        border-style: dashed;
+      }
+      .ro-val-chip {
+        align-items: flex-start;
+        padding: 8px 14px;
+      }
+      .ro-val-chip span {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
     </style>
   </head>
   <body>
@@ -69,15 +111,15 @@
         </div>
         <div class="step" id="step-3">
           <div class="step-num">3</div>
-          <span>Periode &amp; Kolom</span>
+          <span>Format Output</span>
         </div>
         <div class="step" id="step-4">
           <div class="step-num">4</div>
-          <span>Proses</span>
+          <span>Periode &amp; Kolom</span>
         </div>
         <div class="step" id="step-5">
           <div class="step-num">5</div>
-          <span>Export</span>
+          <span>Proses &amp; Export</span>
         </div>
       </div>
 
@@ -274,6 +316,112 @@
               <i class="ti ti-arrow-left"></i> Kembali
             </button>
             <button class="btn btn-primary" id="btn-next-map">
+              Lanjut ke Format Output <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ SECTION 2b: Format Output RO ══════════════ -->
+      <div id="sec-format" class="section hidden">
+        <div class="card">
+          <div class="card-title">
+            <i class="ti ti-layout-columns" aria-hidden="true"></i>
+            Format Output RO
+          </div>
+          <div class="card-sub">
+            Tentukan struktur baris dan nilai yang akan muncul di setiap sheet
+            distributor. Pilihan disesuaikan otomatis dari kolom yang terdeteksi
+            di file DB kamu.
+          </div>
+
+          <!-- Row dimension: detected available fields -->
+          <div style="margin-bottom: 1.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+              "
+            >
+              Kolom baris yang ditampilkan
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Centang kolom yang ingin muncul sebagai baris di tabel output.
+              <strong>Nama Customer</strong> selalu wajib ada.
+            </div>
+            <div
+              id="fmt-row-fields"
+              style="display: flex; flex-wrap: wrap; gap: 8px"
+            ></div>
+          </div>
+
+          <!-- Value field: choose metric -->
+          <div style="margin-bottom: 1.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+              "
+            >
+              Nilai per bulan
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Pilih angka yang akan dipakai sebagai isi tabel untuk setiap
+              bulan.
+            </div>
+            <div
+              id="fmt-value-fields"
+              style="display: flex; flex-wrap: wrap; gap: 8px"
+            ></div>
+          </div>
+
+          <!-- Month label customization — rendered after period is chosen, shown here as placeholder -->
+          <div id="fmt-month-label-section" style="margin-bottom: 1.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+              "
+            >
+              Label kolom bulan
+              <em style="font-size: 11px; font-weight: 400; color: var(--text3)"
+                >(opsional)</em
+              >
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Ganti nama header setiap kolom bulan — misal "April" → "RO April".
+              Biarkan kosong untuk pakai nama default.
+            </div>
+            <div
+              id="fmt-month-labels"
+              style="display: flex; flex-direction: column; gap: 6px"
+            >
+              <div
+                style="font-size: 12px; color: var(--text3); font-style: italic"
+              >
+                Atur periode di langkah berikutnya — label bulan bisa diubah di
+                sini setelah kembali.
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn" id="btn-back-format">
+              <i class="ti ti-arrow-left"></i> Kembali
+            </button>
+            <button class="btn btn-primary" id="btn-next-format">
               Lanjut ke Periode &amp; Kolom <i class="ti ti-arrow-right"></i>
             </button>
           </div>
@@ -394,52 +542,6 @@
           </div>
 
           <div class="col-list" id="col-list"></div>
-
-          <!-- RO Format Output Config -->
-          <div id="ro-output-config" style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border)">
-            <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:0.75rem; display:flex; align-items:center; gap:6px;">
-              <i class="ti ti-settings-2" style="font-size:15px; color:var(--blue)"></i>
-              Format Output RO (per Distributor)
-              <span style="font-size:11px; font-weight:400; color:var(--text3); margin-left:4px">— berlaku untuk format RO, bukan flat</span>
-            </div>
-
-            <!-- Row fields -->
-            <div style="margin-bottom:0.875rem;">
-              <div style="font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:500;">Kolom baris yang ditampilkan:</div>
-              <div style="display:flex; flex-wrap:wrap; gap:8px;" id="ro-row-fields">
-                <label class="ro-field-chip" title="Nama distributor sebagai kolom">
-                  <input type="checkbox" id="rof-dist" value="dist"> Nama DB / Distributor
-                </label>
-                <label class="ro-field-chip" title="Nama salesman (jika ada di data)">
-                  <input type="checkbox" id="rof-salesman" value="salesman"> Nama Salesman
-                </label>
-                <label class="ro-field-chip ro-field-required" title="Wajib ada">
-                  <input type="checkbox" id="rof-cust" value="cust" checked disabled> Nama Customer <em style="font-size:10px;color:var(--text3)">(wajib)</em>
-                </label>
-              </div>
-            </div>
-
-            <!-- Value field -->
-            <div style="margin-bottom:0.875rem;">
-              <div style="font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:500;">Nilai yang dipakai untuk setiap bulan:</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <label class="ro-val-chip">
-                  <input type="radio" name="ro-val" id="roval-qty" value="qty" checked> QTY (kuantitas)
-                </label>
-                <label class="ro-val-chip">
-                  <input type="radio" name="ro-val" id="roval-jumlah" value="jumlah"> DPP / Jumlah Rupiah
-                </label>
-              </div>
-            </div>
-
-            <!-- Month label customization -->
-            <div>
-              <div style="font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:500;">Label kolom bulan: <em style="font-weight:400">(opsional — ubah nama header setiap bulan)</em></div>
-              <div id="ro-month-labels" style="display:flex; flex-direction:column; gap:6px;">
-                <div style="font-size:12px; color:var(--text3); font-style:italic;">Pilih periode terlebih dahulu untuk mengatur label bulan.</div>
-              </div>
-            </div>
-          </div>
 
           <div class="btn-row">
             <button class="btn" id="btn-back-1">
@@ -766,11 +868,11 @@
 
       // RO Output format config
       let roOutputConfig = {
-        rowFields: ["cust"],          // which row-dimension fields to show (dist, salesman, cust)
-        valueField: "qty",            // 'qty' or 'jumlah'
-        monthLabelPrefix: "",         // e.g. "RO " → "RO April"
-        monthLabelSuffix: "",         // e.g. " April" → "April"
-        customMonthLabels: {},        // { "April": "RO April" } overrides per month
+        rowFields: ["cust"], // which row-dimension fields to show (dist, salesman, cust)
+        valueField: "qty", // 'qty' or 'jumlah'
+        monthLabelPrefix: "", // e.g. "RO " → "RO April"
+        monthLabelSuffix: "", // e.g. " April" → "April"
+        customMonthLabels: {}, // { "April": "RO April" } overrides per month
       };
 
       const $ = (id) => document.getElementById(id);
@@ -779,8 +881,8 @@
       //  UI HELPERS
       // ════════════════════════════════════════════════════════════
       function showSection(name) {
-        ["upload", "mapping", "columns", "process", "export"].forEach((s) =>
-          $("sec-" + s).classList.toggle("hidden", s !== name),
+        ["upload", "mapping", "format", "columns", "process", "export"].forEach(
+          (s) => $("sec-" + s).classList.toggle("hidden", s !== name),
         );
       }
 
@@ -929,8 +1031,8 @@
 
         // Set activePeriodMonths
         activePeriodMonths = idxs.map((i) => MONTH_NAMES[i]);
-        // Refresh month label inputs if config panel visible
-        renderROMonthLabels && renderROMonthLabels();
+        // Refresh month label inputs in format section if visible
+        renderFmtMonthLabels && renderFmtMonthLabels();
       }
 
       function renderMonthChips() {
@@ -950,7 +1052,7 @@
             activePeriodMonths = Array.from(manualSelectedMonths)
               .sort((a, b) => a - b)
               .map((i) => MONTH_NAMES[i]);
-            renderROMonthLabels && renderROMonthLabels();
+            renderFmtMonthLabels && renderFmtMonthLabels();
           });
           wrap.appendChild(chip);
         });
@@ -1293,13 +1395,29 @@
 
       $("btn-next-map").addEventListener("click", () => {
         setStep(3);
+        showSection("format");
+        buildFormatSection();
+      });
+
+      $("btn-back-format").addEventListener("click", () => {
+        setStep(2);
+        showSection("mapping");
+      });
+
+      $("btn-next-format").addEventListener("click", () => {
+        setStep(4);
         showSection("columns");
         updateModePills();
         renderCols();
         renderMonthChips();
       });
 
-      // btn-back-1 replaced by btn-back-map
+      $("btn-back-1").addEventListener("click", () => {
+        setStep(3);
+        showSection("format");
+        // Re-render month labels in format section now that period may have been set
+        renderFmtMonthLabels();
+      });
 
       $("btn-next-2").addEventListener("click", () => {
         if (cols.filter((c) => c.enabled).length === 0) {
@@ -1312,14 +1430,173 @@
           return;
         }
         activePeriodMonths = months;
-        setStep(4);
+        setStep(5);
         showSection("process");
         startProcessing();
       });
 
       // ════════════════════════════════════════════════════════════
-      //  COLUMN CONFIG
+      //  FORMAT OUTPUT SECTION — Step 3
+      //  Dynamically builds row-field and value-field choices
+      //  based on what columns were actually detected across all DBs
       // ════════════════════════════════════════════════════════════
+
+      // Slot definitions: which slots can be row-dimensions, which are values
+      const FMT_ROW_SLOTS = [
+        {
+          id: "dist",
+          label: "Nama DB / Distributor",
+          icon: "ti-building-store",
+          always: false,
+          sourceKey: null,
+        },
+        {
+          id: "salesman",
+          label: "Nama Salesman",
+          icon: "ti-user",
+          always: false,
+          sourceKey: "salesman",
+        },
+        {
+          id: "cust",
+          label: "Nama Customer",
+          icon: "ti-user-circle",
+          always: true,
+          sourceKey: "cust",
+        },
+      ];
+      const FMT_VALUE_SLOTS = [
+        {
+          id: "qty",
+          label: "QTY (Kuantitas)",
+          desc: "Jumlah unit/karton per bulan",
+          sourceKey: "qty",
+        },
+        {
+          id: "jumlah",
+          label: "DPP / Jumlah Rupiah",
+          desc: "Nilai rupiah (neto/DPP) per bulan",
+          sourceKey: "jumlah",
+        },
+      ];
+
+      function buildFormatSection() {
+        // Tally which colMap slots are detected (>= 0) across how many DBs
+        const slotCount = {}; // slotKey → count of DBs that have it
+        COL_SLOTS.forEach((s) => {
+          slotCount[s] = 0;
+        });
+        dbMappings
+          .filter((m) => !m.error)
+          .forEach((m) => {
+            COL_SLOTS.forEach((s) => {
+              if (m.colMap[s] >= 0) slotCount[s]++;
+            });
+          });
+        const totalDBs = dbMappings.filter((m) => !m.error).length || 1;
+
+        // ── Row fields ──
+        const rowWrap = $("fmt-row-fields");
+        rowWrap.innerHTML = "";
+        FMT_ROW_SLOTS.forEach((slot) => {
+          const count = slot.sourceKey ? slotCount[slot.sourceKey] : totalDBs; // dist always "available"
+          const pct = Math.round((count / totalDBs) * 100);
+          const available = slot.always || count > 0;
+          const isChecked = roOutputConfig.rowFields.includes(slot.id);
+
+          const chip = document.createElement("label");
+          chip.className =
+            "ro-field-chip" +
+            (slot.always ? " ro-field-required" : "") +
+            (!available ? " ro-field-unavail" : "");
+          chip.title = slot.always
+            ? "Wajib ada"
+            : available
+              ? `Terdeteksi di ${count}/${totalDBs} file DB (${pct}%)`
+              : "Tidak terdeteksi di file DB manapun";
+          chip.innerHTML = `
+            <input type="checkbox" data-field="${slot.id}" ${isChecked ? "checked" : ""} ${slot.always ? "disabled" : !available ? "disabled" : ""}>
+            <i class="ti ${slot.icon}" style="font-size:13px"></i>
+            ${slot.label}
+            ${slot.always ? '<em style="font-size:10px;color:var(--text3);margin-left:2px">(wajib)</em>' : ""}
+            ${!slot.always && available ? `<span style="font-size:10px;color:var(--text3);margin-left:2px">${pct}% DB</span>` : ""}
+            ${!available ? '<span style="font-size:10px;color:var(--red);margin-left:2px">tidak ada</span>' : ""}
+          `;
+          const cb = chip.querySelector("input");
+          cb.addEventListener("change", () => {
+            if (cb.checked) {
+              if (!roOutputConfig.rowFields.includes(slot.id))
+                roOutputConfig.rowFields.push(slot.id);
+            } else {
+              roOutputConfig.rowFields = roOutputConfig.rowFields.filter(
+                (f) => f !== slot.id,
+              );
+            }
+          });
+          rowWrap.appendChild(chip);
+        });
+
+        // ── Value fields ──
+        const valWrap = $("fmt-value-fields");
+        valWrap.innerHTML = "";
+        FMT_VALUE_SLOTS.forEach((slot) => {
+          const count = slotCount[slot.sourceKey] || 0;
+          const pct = Math.round((count / totalDBs) * 100);
+          const available = count > 0;
+          const isSelected = roOutputConfig.valueField === slot.id;
+
+          const chip = document.createElement("label");
+          chip.className =
+            "ro-val-chip" + (!available ? " ro-field-unavail" : "");
+          chip.title = available
+            ? `Terdeteksi di ${count}/${totalDBs} file DB (${pct}%)`
+            : "Tidak terdeteksi di file DB manapun";
+          chip.innerHTML = `
+            <input type="radio" name="ro-val-fmt" value="${slot.id}" ${isSelected ? "checked" : ""} ${!available ? "disabled" : ""}>
+            <span>
+              <strong style="display:block;font-size:12px">${slot.label}</strong>
+              <span style="font-size:11px;color:var(--text3)">${slot.desc}</span>
+              ${available ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${pct}% DB</span>` : '<span style="font-size:10px;color:var(--red)">tidak ada data</span>'}
+            </span>
+          `;
+          const radio = chip.querySelector("input");
+          radio.addEventListener("change", () => {
+            if (radio.checked) roOutputConfig.valueField = slot.id;
+          });
+          valWrap.appendChild(chip);
+        });
+
+        // ── Month labels (if period already set) ──
+        renderFmtMonthLabels();
+      }
+
+      function renderFmtMonthLabels() {
+        const wrap = $("fmt-month-labels");
+        if (!wrap) return;
+        const months = getActivePeriodMonths();
+        if (months.length === 0) {
+          wrap.innerHTML =
+            '<div style="font-size:12px; color:var(--text3); font-style:italic;">Atur periode di langkah berikutnya — label bulan bisa diubah di sini setelah kembali.</div>';
+          return;
+        }
+        wrap.innerHTML = "";
+        months.forEach((m) => {
+          const row = document.createElement("div");
+          row.className = "ro-month-label-row";
+          const cur = roOutputConfig.customMonthLabels[m] || "";
+          row.innerHTML = `<label>${m}</label>
+            <input type="text" placeholder="Nama default: ${m}" value="${esc(cur)}"
+              data-month="${m}" title="Biarkan kosong untuk pakai nama bulan default">`;
+          row.querySelector("input").addEventListener("input", (e) => {
+            const val = e.target.value.trim();
+            if (val)
+              roOutputConfig.customMonthLabels[e.target.dataset.month] = val;
+            else
+              delete roOutputConfig.customMonthLabels[e.target.dataset.month];
+          });
+          wrap.appendChild(row);
+        });
+      }
       function renderCols() {
         const list = $("col-list");
         list.innerHTML = "";
@@ -1348,75 +1625,6 @@
           });
           addDragHandlers(item);
           list.appendChild(item);
-        });
-        renderROOutputConfig();
-      }
-
-      function renderROOutputConfig() {
-        // Sync checkbox state from roOutputConfig
-        const distCb = $("rof-dist");
-        const salesmanCb = $("rof-salesman");
-        if (distCb) distCb.checked = roOutputConfig.rowFields.includes("dist");
-        if (salesmanCb) salesmanCb.checked = roOutputConfig.rowFields.includes("salesman");
-
-        // Sync value radio
-        const qtyRad = $("roval-qty");
-        const jmlRad = $("roval-jumlah");
-        if (qtyRad) qtyRad.checked = roOutputConfig.valueField === "qty";
-        if (jmlRad) jmlRad.checked = roOutputConfig.valueField === "jumlah";
-
-        // Render month label inputs
-        renderROMonthLabels();
-
-        // Hook change events (safe to re-attach — use named fn refs or check flag)
-        if (distCb && !distCb._hooked) {
-          distCb._hooked = true;
-          distCb.addEventListener("change", () => {
-            if (distCb.checked) roOutputConfig.rowFields.push("dist");
-            else roOutputConfig.rowFields = roOutputConfig.rowFields.filter(f => f !== "dist");
-          });
-        }
-        if (salesmanCb && !salesmanCb._hooked) {
-          salesmanCb._hooked = true;
-          salesmanCb.addEventListener("change", () => {
-            if (salesmanCb.checked) roOutputConfig.rowFields.push("salesman");
-            else roOutputConfig.rowFields = roOutputConfig.rowFields.filter(f => f !== "salesman");
-          });
-        }
-        const radios = document.querySelectorAll('input[name="ro-val"]');
-        radios.forEach(r => {
-          if (!r._hooked) {
-            r._hooked = true;
-            r.addEventListener("change", () => {
-              roOutputConfig.valueField = r.value;
-            });
-          }
-        });
-      }
-
-      function renderROMonthLabels() {
-        const wrap = $("ro-month-labels");
-        if (!wrap) return;
-        const months = getActivePeriodMonths();
-        if (months.length === 0) {
-          wrap.innerHTML = '<div style="font-size:12px; color:var(--text3); font-style:italic;">Pilih periode terlebih dahulu untuk mengatur label bulan.</div>';
-          return;
-        }
-        wrap.innerHTML = "";
-        months.forEach(m => {
-          const row = document.createElement("div");
-          row.className = "ro-month-label-row";
-          const cur = roOutputConfig.customMonthLabels[m] || "";
-          row.innerHTML = `<label>${m}</label>
-            <input type="text" placeholder="Label default: ${m}" value="${cur}"
-              data-month="${m}" class="ro-month-input"
-              title="Biarkan kosong untuk pakai nama bulan default">`;
-          row.querySelector("input").addEventListener("input", (e) => {
-            const val = e.target.value.trim();
-            if (val) roOutputConfig.customMonthLabels[e.target.dataset.month] = val;
-            else delete roOutputConfig.customMonthLabels[e.target.dataset.month];
-          });
-          wrap.appendChild(row);
         });
       }
 
@@ -2030,7 +2238,7 @@
       };
 
       function showResults(total) {
-        setStep(5);
+        setStep(5); // step 5 = Proses & Export — stays on same step, just switches section
         showSection("export");
         updateModePills();
         const distSet = new Set(resultData.map((r) => r.dist));
@@ -2140,7 +2348,7 @@
 
         // Build index: dist → rowKey → bulan → value
         // rowKey = joined values of rowFields except 'dist'
-        const nonDistFields = rowFields.filter(f => f !== "dist");
+        const nonDistFields = rowFields.filter((f) => f !== "dist");
         const dataIdx = {};
         // Also track salesman per cust per dist (for display)
         const rowKeyMeta = {}; // dist → rowKey → {cust, salesman, dist}
@@ -2150,14 +2358,18 @@
           const b = row.bulan || "";
           const q = getVal(row);
           // Build row key from non-dist fields
-          const keyParts = nonDistFields.map(f => String(row[f] || "").trim());
+          const keyParts = nonDistFields.map((f) =>
+            String(row[f] || "").trim(),
+          );
           const rowKey = keyParts.join("\u0001"); // unit separator as delimiter
           if (!dataIdx[d]) dataIdx[d] = {};
           if (!dataIdx[d][rowKey]) {
             dataIdx[d][rowKey] = {};
             if (!rowKeyMeta[d]) rowKeyMeta[d] = {};
             const meta = {};
-            rowFields.forEach(f => { meta[f] = String(row[f] || "").trim(); });
+            rowFields.forEach((f) => {
+              meta[f] = String(row[f] || "").trim();
+            });
             rowKeyMeta[d][rowKey] = meta;
           }
           dataIdx[d][rowKey][b] = (dataIdx[d][rowKey][b] || 0) + q;
@@ -2239,7 +2451,8 @@
           const metaData = dataKey ? rowKeyMeta[dataKey] || {} : {};
           const rowKeys = Object.keys(custData).sort((a, b) => {
             // Sort by cust name (last non-dist field)
-            const aM = metaData[a] || {}; const bM = metaData[b] || {};
+            const aM = metaData[a] || {};
+            const bM = metaData[b] || {};
             return (aM.cust || a).localeCompare(bM.cust || b);
           });
 
@@ -2267,15 +2480,17 @@
           wsData.push([displayName]);
 
           // Build header columns based on rowFields
-          const nonDistHdr = nonDistFields.map(f => {
+          const nonDistHdr = nonDistFields.map((f) => {
             if (f === "cust") return "NAMA CUSTOMER";
             if (f === "salesman") return "NAMA SALESMAN";
             return f.toUpperCase();
           });
-          const distHdr = rowFields.includes("dist") ? ["NAMA DB / DISTRIBUTOR"] : [];
+          const distHdr = rowFields.includes("dist")
+            ? ["NAMA DB / DISTRIBUTOR"]
+            : [];
 
           // Row 2: group headers (NO | row-dimension cols | BULAN spanning)
-          const monthLabels = months.map(m => getMonthLabel(m));
+          const monthLabels = months.map((m) => getMonthLabel(m));
           wsData.push([
             "NO",
             ...distHdr,
@@ -2283,14 +2498,19 @@
             "BULAN",
             ...months.slice(1).map(() => null),
           ]);
-          wsData.push([null, ...distHdr.map(() => null), ...nonDistHdr.map(() => null), ...monthLabels]);
+          wsData.push([
+            null,
+            ...distHdr.map(() => null),
+            ...nonDistHdr.map(() => null),
+            ...monthLabels,
+          ]);
 
           // Customer/row data
           if (rowKeys.length > 0) {
             rowKeys.forEach((rk, i) => {
               const meta = metaData[rk] || {};
               const distVal = rowFields.includes("dist") ? [displayName] : [];
-              const nonDistVals = nonDistFields.map(f => meta[f] || "");
+              const nonDistVals = nonDistFields.map((f) => meta[f] || "");
               const monthVals = months.map((pm) => {
                 const pmNorm = pm.toUpperCase().trim();
                 const val = custData[rk];
@@ -2309,14 +2529,24 @@
           } else {
             const distPlaceholder = rowFields.includes("dist") ? [""] : [];
             const nonDistPlaceholder = nonDistFields.map(() => "");
-            wsData.push([1, ...distPlaceholder, ...nonDistPlaceholder.map((_, i) => i === nonDistPlaceholder.length - 1 ? "(tidak ada data)" : ""), ...months.map(() => null)]);
+            wsData.push([
+              1,
+              ...distPlaceholder,
+              ...nonDistPlaceholder.map((_, i) =>
+                i === nonDistPlaceholder.length - 1 ? "(tidak ada data)" : "",
+              ),
+              ...months.map(() => null),
+            ]);
           }
 
           // Summary row: total per bulan
-          const extraColsBefore = (rowFields.includes("dist") ? 1 : 0) + nonDistFields.length;
+          const extraColsBefore =
+            (rowFields.includes("dist") ? 1 : 0) + nonDistFields.length;
           const totalRow = [
             "",
-            ...Array(extraColsBefore).fill("").map((_, i) => i === extraColsBefore - 1 ? "TOTAL" : ""),
+            ...Array(extraColsBefore)
+              .fill("")
+              .map((_, i) => (i === extraColsBefore - 1 ? "TOTAL" : "")),
             ...months.map((pm) => {
               let total = 0;
               rowKeys.forEach((rk) => {
@@ -2339,7 +2569,13 @@
 
           // Create sheet
           const ws = XLSX.utils.aoa_to_sheet(wsData);
-          const fixedCols = [{ wch: 5 }, ...distHdr.map(() => ({ wch: 30 })), ...nonDistHdr.map(h => ({ wch: h === "NAMA CUSTOMER" ? 36 : 22 }))];
+          const fixedCols = [
+            { wch: 5 },
+            ...distHdr.map(() => ({ wch: 30 })),
+            ...nonDistHdr.map((h) => ({
+              wch: h === "NAMA CUSTOMER" ? 36 : 22,
+            })),
+          ];
           ws["!cols"] = [...fixedCols, ...months.map(() => ({ wch: 12 }))];
 
           const sheetName = displayName
@@ -2357,7 +2593,12 @@
         const summaryData = [
           ["COLLECT DB — RINGKASAN RO"],
           [],
-          ["NO", "NAMA DISTRIBUTOR", ...months.map(m => getMonthLabel(m)), "TOTAL"],
+          [
+            "NO",
+            "NAMA DISTRIBUTOR",
+            ...months.map((m) => getMonthLabel(m)),
+            "TOTAL",
+          ],
         ];
         distOrder.forEach(({ displayName, dataKey }, i) => {
           const custData = dataKey ? dataIdx[dataKey] || {} : {};
@@ -2516,7 +2757,13 @@
         custOverrides = {};
         matcherCurrentDist = null;
         tplROCustomers = [];
-        roOutputConfig = { rowFields: ["cust"], valueField: "qty", monthLabelPrefix: "", monthLabelSuffix: "", customMonthLabels: {} };
+        roOutputConfig = {
+          rowFields: ["cust"],
+          valueField: "qty",
+          monthLabelPrefix: "",
+          monthLabelSuffix: "",
+          customMonthLabels: {},
+        };
         $("matcher-fab").classList.add("hidden");
         dbMappings = [];
         zipFileCache = {};
@@ -3216,7 +3463,15 @@
       let tplSheetNames = []; // sheet names from template (excluding Sheet1)
 
       // Column slots we need to fill for every distributor
-      const COL_SLOTS = ["cust", "bulan", "barang", "qty", "satuan", "jumlah", "salesman"];
+      const COL_SLOTS = [
+        "cust",
+        "bulan",
+        "barang",
+        "qty",
+        "satuan",
+        "jumlah",
+        "salesman",
+      ];
       const COL_LABELS = {
         cust: "Nama Customer",
         bulan: "Bulan",
@@ -3858,7 +4113,7 @@
         // Only read columns we actually need (avoids deserializing huge unused columns)
         const colMap = mapping.colMap;
         const neededCols = new Set(
-          Object.values(colMap).filter((v) => typeof v === "number" && v >= 0)
+          Object.values(colMap).filter((v) => typeof v === "number" && v >= 0),
         );
 
         // Clip sheet's column range to max needed column to skip deserializing wide sheets
@@ -3876,7 +4131,9 @@
                 }),
               });
             }
-          } catch (_) { /* use original ws */ }
+          } catch (_) {
+            /* use original ws */
+          }
         }
 
         const data = XLSX.utils.sheet_to_json(clippedWs, {
@@ -3953,7 +4210,10 @@
             const m = entries[i];
             // Show progress BEFORE parse so user sees movement immediately
             const pct = (i / entries.length) * 85;
-            setProgress(pct, `Memproses: ${m.shortName} (${i + 1}/${entries.length})`);
+            setProgress(
+              pct,
+              `Memproses: ${m.shortName} (${i + 1}/${entries.length})`,
+            );
             document.getElementById("process-sub").textContent =
               `Memproses file ${i + 1} dari ${entries.length}...`;
             // Yield BEFORE every parse so the progress update renders first
@@ -4001,7 +4261,8 @@
 
           // Post-processing steps — show progress so user knows we're still working
           setProgress(88, "Menyusun hasil...");
-          document.getElementById("process-sub").textContent = "Menyusun ringkasan...";
+          document.getElementById("process-sub").textContent =
+            "Menyusun ringkasan...";
           await new Promise((r) => setTimeout(r, 0));
 
           showResults(
@@ -4009,7 +4270,8 @@
           );
 
           setProgress(93, "Menghitung kecocokan customer...");
-          document.getElementById("process-sub").textContent = "Analisis nama customer...";
+          document.getElementById("process-sub").textContent =
+            "Analisis nama customer...";
           await new Promise((r) => setTimeout(r, 0));
 
           $("matcher-fab").classList.remove("hidden");
@@ -4021,7 +4283,8 @@
           });
 
           setProgress(100, "Selesai!");
-          document.getElementById("process-sub").textContent = "Semua file berhasil diproses.";
+          document.getElementById("process-sub").textContent =
+            "Semua file berhasil diproses.";
         } else {
           // fallback: no mapping done, use original processing
           return _origStartProcessing();
