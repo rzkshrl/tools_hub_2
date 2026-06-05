@@ -541,6 +541,19 @@
                 Pilih sendiri bulan mana saja yang dimasukkan
               </div>
             </button>
+            <button
+              class="period-mode-btn"
+              id="pmb-total"
+              onclick="setPeriodMode('total')"
+            >
+              <div class="pmb-title">
+                <i class="ti ti-stack-2" style="font-size: 14px"></i>
+                Merge Total
+              </div>
+              <div class="pmb-desc">
+                Gabung semua bulan tanpa memilih bulan RO
+              </div>
+            </button>
           </div>
 
           <!-- Auto mode -->
@@ -582,6 +595,23 @@
               Pilih bulan yang ingin dimasukkan (urutan otomatis Okt → Sep):
             </div>
             <div class="month-manual-wrap" id="month-chips-wrap"></div>
+          </div>
+
+          <!-- Total mode -->
+          <div id="period-total-wrap" class="hidden">
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 8px"
+            >
+              Semua bulan yang ada di data digabung menjadi satu file flat —
+              tanpa perlu memilih bulan RO. Bulan yang disertakan ditandai
+              hijau; klik untuk mengecualikan bulan tertentu.
+            </div>
+            <div class="month-manual-wrap" id="total-month-chips">
+              <span style="color: var(--text3); font-size: 12px"
+                >Bulan akan terdeteksi otomatis dari data saat diproses. Semua
+                bulan akan disertakan.</span
+              >
+            </div>
           </div>
         </div>
 
@@ -929,10 +959,11 @@
       let exportMode = "template";
 
       // Period state
-      let periodMode = "auto"; // 'auto' | 'manual'
+      let periodMode = "auto"; // 'auto' | 'manual' | 'total'
       let targetMonthIdx = -1; // 0-11 for auto mode
       let activePeriodMonths = []; // final array of month names to use (e.g. ['Desember','Januari','Februari'])
       let manualSelectedMonths = new Set();
+      let totalExcludedMonths = new Set(); // months (0-11) to EXCLUDE in total mode
 
       // RO Output format config
       let roOutputConfig = {
@@ -1028,8 +1059,60 @@
         periodMode = mode;
         $("pmb-auto").classList.toggle("selected", mode === "auto");
         $("pmb-manual").classList.toggle("selected", mode === "manual");
+        const pmbTotal = $("pmb-total");
+        if (pmbTotal) pmbTotal.classList.toggle("selected", mode === "total");
         $("period-auto-wrap").classList.toggle("hidden", mode !== "auto");
         $("period-manual-wrap").classList.toggle("hidden", mode !== "manual");
+        const totalWrap = $("period-total-wrap");
+        if (totalWrap) totalWrap.classList.toggle("hidden", mode !== "total");
+        if (mode === "total") renderTotalMonthChips();
+      }
+
+      // All months present in the data, sorted Jan->Dec (used by Total mode).
+      function allMonthsInData() {
+        const present = new Set();
+        resultData.forEach((r) => {
+          const idx = parseMonthIdx(r.bulan);
+          if (idx >= 0) present.add(idx);
+        });
+        return Array.from(present).sort((a, b) => a - b);
+      }
+
+      function renderTotalMonthChips() {
+        const wrap = $("total-month-chips");
+        if (!wrap) return;
+        const present = allMonthsInData();
+        if (present.length === 0) {
+          wrap.innerHTML =
+            '<span style="color:var(--text3);font-size:12px">Bulan akan terdeteksi otomatis dari data saat diproses. Semua bulan akan disertakan.</span>';
+          return;
+        }
+        wrap.innerHTML = "";
+        present.forEach((idx) => {
+          const chip = document.createElement("div");
+          const excluded = totalExcludedMonths.has(idx);
+          chip.className = "month-chip" + (excluded ? "" : " active");
+          chip.textContent = MONTH_NAMES[idx];
+          chip.title = excluded
+            ? "Klik untuk sertakan"
+            : "Klik untuk kecualikan";
+          chip.addEventListener("click", () => {
+            if (totalExcludedMonths.has(idx)) totalExcludedMonths.delete(idx);
+            else totalExcludedMonths.add(idx);
+            chip.classList.toggle("active", !totalExcludedMonths.has(idx));
+            recomputeTotalActiveMonths();
+          });
+          wrap.appendChild(chip);
+        });
+        recomputeTotalActiveMonths();
+      }
+
+      function recomputeTotalActiveMonths() {
+        const present = allMonthsInData();
+        activePeriodMonths = present
+          .filter((i) => !totalExcludedMonths.has(i))
+          .map((i) => MONTH_NAMES[i]);
+        renderFmtMonthLabels && renderFmtMonthLabels();
       }
 
       function getQuarterMonths(targetIdx) {
@@ -1130,6 +1213,14 @@
         if (periodMode === "auto") {
           if (targetMonthIdx < 0) return [];
           return getQuarterMonths(targetMonthIdx).map((i) => MONTH_NAMES[i]);
+        } else if (periodMode === "total") {
+          // All months in data minus exclusions. Empty before processing
+          // (data not loaded yet) → [] means "all", resolved post-process.
+          const present = allMonthsInData();
+          if (present.length === 0) return [];
+          return present
+            .filter((i) => !totalExcludedMonths.has(i))
+            .map((i) => MONTH_NAMES[i]);
         } else {
           return Array.from(manualSelectedMonths)
             .sort((a, b) => a - b)
@@ -1539,11 +1630,13 @@
           return;
         }
         const months = getActivePeriodMonths();
-        if (months.length === 0) {
+        // Total mode: empty list is valid (means "all months in data",
+        // resolved after processing). Other modes still require a selection.
+        if (periodMode !== "total" && months.length === 0) {
           alert("Pilih minimal 1 bulan untuk periode RO.");
           return;
         }
-        activePeriodMonths = months;
+        activePeriodMonths = months; // may be [] for total → resolved post-process
         setStep(5);
         showSection("process");
         startProcessing();
@@ -2036,6 +2129,11 @@
         const str = (v) => (v == null ? "" : String(v).trim());
 
         // Try "Rincian Penjualan per Barang"
+        // NOTE: this sheet name is shared by several distributors with DIFFERENT
+        // column orders (SAJ, Aldi Lamongan/Tuban, UD Sejahtera, ...). Detect
+        // columns by header NAME so a layout like UD Sejahtera Bwi (cust=10,
+        // barang=3, qty=4, sat=5, jumlah=8, bulan=text col9) is not misread
+        // with another distributor's fixed offsets.
         if (wb.SheetNames.includes("Rincian Penjualan per Barang")) {
           const ws = wb.Sheets["Rincian Penjualan per Barang"];
           const data = XLSX.utils.sheet_to_json(ws, {
@@ -2044,8 +2142,70 @@
             raw: true,
           });
           if (data.length > 1) {
-            const hdr = data[0] || [];
-            const isSAJ = str(hdr[0]).toLowerCase().includes("cabang");
+            const hn = (data[0] || []).map((v) =>
+              String(v || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, ""),
+            );
+            const findCol = (exact, partial, avoid) => {
+              const banned = (i) =>
+                (avoid || []).some((a) => hn[i].includes(a));
+              for (const a of exact) {
+                const i = hn.findIndex((h, j) => h === a && !banned(j));
+                if (i >= 0) return i;
+              }
+              for (const a of partial || []) {
+                const i = hn.findIndex((h, j) => h.includes(a) && !banned(j));
+                if (i >= 0) return i;
+              }
+              return -1;
+            };
+            const custIdx = findCol(
+              ["namapelanggan", "namacustomer", "nmcust"],
+              ["pelanggan", "customer"],
+            );
+            const brgIdx = findCol(
+              ["namabarang", "namaproduk"],
+              ["namabarang"],
+            );
+            const qtyIdx = findCol(
+              ["kuantitas", "qty"],
+              ["kuantitas", "qty"],
+              ["jumlahrp"],
+            );
+            const satIdx = findCol(["satuan", "sat"], ["satuan"], ["hargasat"]);
+            const jmlIdx = findCol(
+              ["dpp", "penjualan", "neto", "subtotal"],
+              ["dpp", "penjualan"],
+              ["disc", "ppn", "potongan"],
+            );
+            const blnTextIdx = findCol(["bulan", "bln"], ["bulan"]);
+            const tglIdx = findCol(["tanggal", "tgl"], ["tanggal", "tgl"]);
+
+            if (custIdx >= 0 && brgIdx >= 0) {
+              rows = data
+                .slice(1)
+                .filter((r) => r.some((v) => v != null))
+                .map((r) => {
+                  let bulan = blnTextIdx >= 0 ? str(col(r, blnTextIdx)) : "";
+                  if (!bulan && tglIdx >= 0)
+                    bulan = getMonthName(xlsxDateToJS(col(r, tglIdx)));
+                  return {
+                    dist: distName,
+                    cust: str(col(r, custIdx)),
+                    bulan: bulan,
+                    barang: str(col(r, brgIdx)),
+                    qty: qtyIdx >= 0 ? col(r, qtyIdx) : null,
+                    satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
+                    jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : null,
+                  };
+                })
+                .filter((r) => r.cust && r.barang);
+              if (rows.length > 0) return rows;
+            }
+
+            // Legacy positional fallback (older files / unexpected headers)
+            const isSAJ = str(data[0][0]).toLowerCase().includes("cabang");
             rows = data
               .slice(1)
               .filter((r) => r.some((v) => v != null))
@@ -2507,7 +2667,12 @@
           `Ditemukan ${allXlsxFiles.length} file .xlsx, dipilih ${xlsxFiles.length} DB`,
           "info",
         );
-        log(`Periode RO: ${activePeriodMonths.join(" → ")}`, "info");
+        log(
+          periodMode === "total"
+            ? "Mode periode: Merge Total (semua bulan di data)"
+            : `Periode RO: ${activePeriodMonths.join(" → ")}`,
+          "info",
+        );
         if (tplActive)
           log(`Mode: Template RO — ${tplDistOrder.length} distributor`, "info");
         else log("Mode: Default (format flat)", "info");
@@ -2576,9 +2741,18 @@
         $("stat-err").style.color =
           errors.length > 0 ? "var(--red)" : "var(--text)";
 
-        // Period summary
+        // Period summary. In total mode, resolve the month list now that data
+        // is loaded (all detected months minus user exclusions).
+        if (periodMode === "total") {
+          recomputeTotalActiveMonths();
+          renderTotalMonthChips();
+        }
         const ps = $("period-summary");
-        ps.textContent = `Periode: ${activePeriodMonths.join(" → ")} (${activePeriodMonths.length} bulan)`;
+        if (periodMode === "total") {
+          ps.textContent = `Merge Total — ${activePeriodMonths.length} bulan: ${activePeriodMonths.join(", ")}`;
+        } else {
+          ps.textContent = `Periode: ${activePeriodMonths.join(" → ")} (${activePeriodMonths.length} bulan)`;
+        }
 
         // Refresh quarter preview with actual data
         if (periodMode === "auto" && targetMonthIdx >= 0) onTargetMonthChange();
@@ -2592,7 +2766,9 @@
 
         // Show format selector — always show since we now always have RO mode
         $("export-format-section").classList.remove("hidden");
-        selectExportMode(tplActive ? "template" : "template"); // default to RO per-distributor
+        // Total mode defaults to FLAT (single merged sheet, matches the
+        // combined Excel); auto/manual default to per-distributor RO.
+        selectExportMode(periodMode === "total" ? "flat" : "template");
       }
 
       $("btn-cancel").addEventListener("click", () => {
@@ -3063,6 +3239,7 @@
         targetMonthIdx = -1;
         activePeriodMonths = [];
         manualSelectedMonths.clear();
+        totalExcludedMonths.clear();
 
         $("file-selected").classList.add("hidden");
         $("db-sel-card").classList.add("hidden");
@@ -3811,78 +3988,132 @@
         salesman: "Nama Salesman",
       };
 
-      // Known header aliases per slot (for auto-detect)
-      const COL_ALIASES = {
-        cust: [
-          "nama customer",
-          "customer",
-          "nama pelanggan",
-          "pelanggan",
-          "nmcust",
-          "nama toko",
-          "toko",
-          "cust",
-          "outlet",
-          "nama outlet",
-        ],
-        bulan: [
-          "bulan",
-          "bln",
-          "bulan faktur",
-          "month",
-          "periode",
-          "tanggal",
-          "tgl",
-          "date",
-          "range[tanggal]",
-        ],
-        barang: [
-          "nama barang",
-          "barang",
-          "produk",
-          "nama produk",
-          "item",
-          "nmbrg",
-          "nama item",
-          "kode barang",
-          "namabrg",
-          "range[namabrg]",
-        ],
-        qty: [
-          "qty",
-          "kuantitas",
-          "jumlah barang",
-          "volume",
-          "quantity",
-          "range[qty]",
-          "jumlah",
-          "qyt",
-        ],
-        satuan: ["satuan", "uom", "unit", "sat", "range[satuan]"],
-        jumlah: [
-          "neto",
-          "net amount",
-          "subtotal",
-          "total harga",
-          "nilai",
-          "jumlah rupiah",
-          "amount",
-          "dpp",
-          "harga jual",
-          "total",
-          "nilai retur",
-        ],
-        salesman: [
-          "salesman",
-          "sales",
-          "nama salesman",
-          "nama sales",
-          "sales name",
-          "kode salesman",
-          "salesman name",
-          "sman",
-        ],
+      // Column detection rules per slot, in PRIORITY tiers.
+      // Header text is normalized before matching: lowercased, punctuation /
+      // whitespace removed — so "D.P.P", "DPP" and "d p p" all become "dpp".
+      // `avoid` substrings are never chosen for that slot.
+      //
+      // Priority is what fixes the reconciliation bugs:
+      //   jumlah -> DPP must win over "total harga"/"subtotal" (Aldi, Borobudur)
+      //   barang -> NAMA barang/produk must win over KODE (CC, Sinar)
+      //   qty    -> "qtysoldtotalpcs" beats "qtysold" (CC); "jumlah" only as
+      //             last resort for Bravo, never a rupiah column.
+      const COL_RULES = {
+        cust: {
+          exact: [
+            "namacustomer",
+            "namapelanggan",
+            "nmcust",
+            "customer",
+            "pelanggan",
+            "namatoko",
+            "listcustomer",
+            "custnm",
+            "namacust",
+          ],
+          partial: ["pelanggan", "customer", "namatoko", "outlet"],
+          avoid: ["kodecustomer", "kodecust", "custid", "kodepelanggan"],
+        },
+        bulan: {
+          exact: ["bulan", "bln", "bulanfaktur", "month", "periode"],
+          partial: ["bulan"],
+          avoid: [],
+        },
+        barang: {
+          exact: [
+            "namabarang",
+            "namaproduk",
+            "namaproduct",
+            "nmbrg",
+            "nmbarang",
+            "namaitem",
+            "nmproduk",
+            "namabrg",
+          ],
+          partial: ["namabarang", "namaproduk", "namaproduct", "namaitem"],
+          avoid: [],
+        },
+        qty: {
+          exact: [
+            "qtysoldtotalpcs",
+            "qty",
+            "kuantitas",
+            "qtyfaktur",
+            "quantity",
+            "qyt",
+            "jumlah",
+          ],
+          partial: ["kuantitas", "qtytotalpcs", "qty"],
+          avoid: [
+            "jumlahrp",
+            "jumlahrupiah",
+            "qtysoldcrt",
+            "qtysolduom1",
+            "qtysolduom2",
+            "qtysolduom3",
+            "qtyorder",
+            "qtyterbesar",
+            "qtyterkecil",
+          ],
+        },
+        satuan: {
+          exact: ["satuan", "sat", "uom", "unit", "satuanfaktur"],
+          partial: ["satuan", "unit"],
+          avoid: [
+            "satuanterbesar",
+            "satuanterkecil",
+            "hgsatuan",
+            "hargasatuan",
+            "hargasat",
+          ],
+        },
+        jumlah: {
+          exact: [
+            "dpp",
+            "dppvalue",
+            "neto",
+            "netto",
+            "netamount",
+            "subtotal",
+            "subtotalrp",
+            "nilai",
+            "jumlahrupiah",
+          ],
+          partial: ["dpp", "neto", "subtotal"],
+          avoid: [
+            "disc",
+            "diskon",
+            "ppn",
+            "potongan",
+            "hargasat",
+            "hargasatuan",
+          ],
+        },
+        salesman: {
+          exact: [
+            "namasalesman",
+            "namasales",
+            "salesman",
+            "nmsales",
+            "sales",
+            "penjual",
+            "namatenagapenjual",
+            "kodesalesman",
+            "nmslm",
+          ],
+          partial: ["salesman", "namasales", "penjual", "tenagapenjual"],
+          avoid: [],
+        },
       };
+      // Barang KODE fallback (used only if no NAMA column found)
+      const BARANG_KODE = {
+        exact: ["kodebarang", "kode", "kodeproduk", "kodeitem"],
+        partial: ["kodebarang", "kodeproduk"],
+      };
+      const normHdr = (s) =>
+        String(s || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
 
       // Fuzzy sheet name matcher (for DB file → template sheet)
       function matchSheetToTemplate(dbName, tplSheets) {
@@ -3950,39 +4181,73 @@
         return { sheet: null, score: 0 };
       }
 
-      // Auto-detect best sheet in DB file for data extraction
+      // Auto-detect best sheet in DB file for data extraction.
+      // Scores every sheet by whether its header row looks like a long-format
+      // transaction table (has a customer-ish AND product-ish column) so
+      // PIVOT/Sheet1 summary tabs (Aquilla, Berkah) are never chosen over the
+      // real data sheet.
       function detectBestSheet(wb) {
-        const priority = [
-          "laporan_penjualan_format2",
-          "rincian penjualan per barang",
-          "penjualan_by_salesman",
+        const NAME_PRIORITY = [
+          "laporanpenjualanformat2",
+          "rincianpenjualanperbarang",
+          "penjualanbysalesman",
+          "listfakturpenjualan",
           "data",
           "page1",
-          "sheet1",
-          "sheet4",
         ];
-        for (const p of priority) {
-          const hit = wb.SheetNames.find(
-            (s) =>
-              s.toLowerCase().replace(/[^a-z0-9]/g, "") ===
-              p.replace(/[^a-z0-9]/g, ""),
-          );
+        const normName = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        for (const p of NAME_PRIORITY) {
+          const hit = wb.SheetNames.find((s) => {
+            const n = normName(s);
+            return n === p || n.startsWith(p) || n.includes(p);
+          });
           if (hit) return hit;
         }
-        // Find sheet with most rows
-        let bestSheet = wb.SheetNames[0],
-          bestRows = 0;
+        const isCust = (h) =>
+          /pelanggan|customer|nmcust|namatoko|listcustomer|custnm/.test(h);
+        const isBrg = (h) =>
+          /namabarang|namaproduk|namaproduct|nmbrg|namaitem|nmproduk|kodebarang|kodeproduk/.test(
+            h,
+          );
+        let best = wb.SheetNames[0],
+          bestScore = -1;
         wb.SheetNames.forEach((sn) => {
+          if (sn.includes("~")) return;
           const ws = wb.Sheets[sn];
-          const ref = ws["!ref"];
-          if (!ref) return;
-          const range = XLSX.utils.decode_range(ref);
-          if (range.e.r > bestRows) {
-            bestRows = range.e.r;
-            bestSheet = sn;
+          if (!ws || !ws["!ref"]) return;
+          let range;
+          try {
+            range = XLSX.utils.decode_range(ws["!ref"]);
+          } catch (_) {
+            return;
+          }
+          const rowCount = range.e.r;
+          const head = XLSX.utils.sheet_to_json(
+            Object.assign({}, ws, {
+              "!ref": XLSX.utils.encode_range({
+                s: range.s,
+                e: { c: range.e.c, r: Math.min(range.e.r, 12) },
+              }),
+            }),
+            { header: 1, defval: null, raw: true },
+          );
+          let hasCust = false,
+            hasBrg = false;
+          head.forEach((r) =>
+            (r || []).forEach((v) => {
+              const h = normHdr(v);
+              if (isCust(h)) hasCust = true;
+              if (isBrg(h)) hasBrg = true;
+            }),
+          );
+          const quality = (hasCust ? 1 : 0) + (hasBrg ? 1 : 0);
+          const score = quality * 1e7 + rowCount;
+          if (score > bestScore) {
+            bestScore = score;
+            best = sn;
           }
         });
-        return bestSheet;
+        return best;
       }
 
       // Auto-detect column indices from header row
@@ -4039,41 +4304,60 @@
             .toLowerCase()
             .trim(),
         );
+        const hdrNorm = (data[hdrIdx] || []).map((v) => normHdr(v));
         const map = {};
-        const str = (s) =>
-          String(s || "")
-            .toLowerCase()
-            .trim();
 
-        COL_SLOTS.forEach((slot) => {
-          const aliases = COL_ALIASES[slot];
-          // exact match first
-          let idx = hdr.findIndex((h) => aliases.includes(h));
-          if (idx >= 0) {
-            map[slot] = idx;
-            return;
+        // Find first column whose normalized header matches a rule tier,
+        // skipping `avoid` substrings and already-assigned columns.
+        const used = new Set();
+        const matchRule = (rule) => {
+          if (!rule) return -1;
+          const avoid = rule.avoid || [];
+          const banned = (i) =>
+            used.has(i) || avoid.some((a) => hdrNorm[i].includes(a));
+          for (const a of rule.exact || []) {
+            const i = hdrNorm.findIndex((h, j) => h === a && !banned(j));
+            if (i >= 0) return i;
           }
-          // partial match
-          idx = hdr.findIndex((h) =>
-            aliases.some((a) => h.includes(a) || a.includes(h)),
-          );
-          if (idx >= 0) {
-            map[slot] = idx;
-            return;
+          for (const a of rule.partial || []) {
+            const i = hdrNorm.findIndex((h, j) => h.includes(a) && !banned(j));
+            if (i >= 0) return i;
           }
-          map[slot] = -1;
+          return -1;
+        };
+
+        // Assign value/identity slots first so each reserves its column,
+        // preventing a later slot from stealing it.
+        [
+          "jumlah",
+          "qty",
+          "satuan",
+          "barang",
+          "cust",
+          "salesman",
+          "bulan",
+        ].forEach((slot) => {
+          let idx = matchRule(COL_RULES[slot]);
+          if (slot === "barang" && idx < 0) idx = matchRule(BARANG_KODE);
+          map[slot] = idx;
+          if (idx >= 0) used.add(idx);
         });
 
-        // Special: if bulan not found but tanggal/date found, use date col (will convert later)
+        // Bulan fallback: no month-text column → use a date/tanggal column
+        // (converted to month name later during extraction).
         if (map.bulan < 0) {
-          const dateIdx = hdr.findIndex(
-            (h) =>
-              h.includes("tanggal") ||
-              h.includes("date") ||
-              h.includes("tgl") ||
-              h.includes("range[tanggal]"),
+          const dateIdx = hdrNorm.findIndex(
+            (h, j) =>
+              !used.has(j) &&
+              (h.includes("tanggal") ||
+                h.includes("tgl") ||
+                h === "date" ||
+                h.includes("rangetanggal")),
           );
-          if (dateIdx >= 0) map.bulan = dateIdx;
+          if (dateIdx >= 0) {
+            map.bulan = dateIdx;
+            used.add(dateIdx);
+          }
         }
 
         // Get sample values from first data row after header
@@ -4175,14 +4459,14 @@
             // Yield before each parse to keep browser responsive
             await new Promise((r) => setTimeout(r, 0));
 
-            // Parse with minimal options: no cellDates here (we only need headers/structure)
-            // Use sheetStubs:false, dense:false (defaults) for lower memory
+            // Parse only the TOP rows of each sheet for header/column
+            // detection — detectBestSheet looks at ≤12 rows and detectCols at
+            // ≤20, so 25 is enough and avoids deserializing huge sheets twice.
             const wb = XLSX.read(ab, {
               type: "array",
               raw: true,
               cellDates: true,
-              // Only parse sheets metadata first to pick best sheet
-              bookSheets: false,
+              sheetRows: 25,
               bookVBA: false,
             });
 
@@ -4540,7 +4824,12 @@
           setProgress(0, "Memproses data...");
           document.getElementById("process-sub").textContent =
             "Memproses file...";
-          log(`Periode RO: ${activePeriodMonths.join(" → ")}`, "info");
+          log(
+            periodMode === "total"
+              ? "Mode periode: Merge Total (semua bulan di data)"
+              : `Periode RO: ${activePeriodMonths.join(" → ")}`,
+            "info",
+          );
           if (tplActive)
             log(
               `Mode: Template RO — ${tplDistOrder.length} distributor`,
