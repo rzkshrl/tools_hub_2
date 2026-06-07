@@ -288,8 +288,66 @@
             ></div>
           </div>
 
-          <!-- Value field: choose metric -->
+          <!-- Value mode: RO count vs metric value -->
           <div style="margin-bottom: 1.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+              "
+            >
+              Jenis perhitungan
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              <strong>RO</strong> = jumlah customer/outlet unik yang
+              bertransaksi minimal 1× per bulan (dihitung 1 per outlet).
+              <strong>Nilai</strong> = jumlahkan kolom angka (QTY/DPP).
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <label class="ro-val-chip">
+                <input
+                  type="radio"
+                  name="ro-value-mode"
+                  value="ro"
+                  onchange="setRoValueMode('ro')"
+                />
+                <span
+                  ><strong
+                    style="display: block; font-size: 12px; color: var(--text)"
+                    >RO (hitung outlet)</strong
+                  >
+                  <span style="font-size: 11px; color: var(--text3)"
+                    >Customer unik bertransaksi per bulan</span
+                  ></span
+                >
+              </label>
+              <label class="ro-val-chip">
+                <input
+                  type="radio"
+                  name="ro-value-mode"
+                  value="value"
+                  checked
+                  onchange="setRoValueMode('value')"
+                />
+                <span
+                  ><strong
+                    style="display: block; font-size: 12px; color: var(--text)"
+                    >Nilai (QTY / DPP)</strong
+                  >
+                  <span style="font-size: 11px; color: var(--text3)"
+                    >Jumlahkan kolom angka di bawah</span
+                  ></span
+                >
+              </label>
+            </div>
+          </div>
+
+          <!-- Value field: choose metric -->
+          <div id="fmt-value-metric-wrap" style="margin-bottom: 1.25rem">
             <div
               style="
                 font-size: 13px;
@@ -957,6 +1015,13 @@
       let tplDataSheetName = null;
       let tplActive = false;
       let exportMode = "template";
+      // Reference layout taken from the template's data/reference sheet.
+      // This makes the RO-per-sheet output follow WHATEVER columns the user put
+      // in their uploaded template instead of a fixed hard-coded layout.
+      //   tplRefColumns: [{ header, slot, isMonth }]  (in original column order)
+      //   slot ∈ {dist,salesman,cust,bulan,barang,qty,satuan,jumlah,null}
+      let tplRefColumns = []; // [] → fall back to built-in default layout
+      let tplRefSheetName = null;
 
       // Period state
       let periodMode = "auto"; // 'auto' | 'manual' | 'total'
@@ -968,7 +1033,8 @@
       // RO Output format config
       let roOutputConfig = {
         rowFields: ["cust"], // which row-dimension fields to show (dist, salesman, cust)
-        valueField: "qty", // 'qty' or 'jumlah'
+        valueField: "qty", // 'qty' or 'jumlah' (used when valueMode === 'value')
+        valueMode: "value", // 'value' = sum qty/jumlah | 'ro' = count distinct customers/outlets with ≥1 trx
         monthLabelPrefix: "", // e.g. "RO " → "RO April"
         monthLabelSuffix: "", // e.g. " April" → "April"
         customMonthLabels: {}, // { "April": "RO April" } overrides per month
@@ -1050,6 +1116,18 @@
         exportMode = mode;
         $("emb-template").classList.toggle("selected", mode === "template");
         $("emb-flat").classList.toggle("selected", mode === "flat");
+      }
+
+      // RO output: switch between counting outlets (RO) and summing a metric.
+      function setRoValueMode(mode) {
+        roOutputConfig.valueMode = mode;
+        const wrap = $("fmt-value-metric-wrap");
+        // The metric picker (QTY/DPP) is only relevant in "value" mode.
+        if (wrap) wrap.style.opacity = mode === "ro" ? "0.45" : "1";
+        if (wrap)
+          wrap
+            .querySelectorAll("input")
+            .forEach((i) => (i.disabled = mode === "ro"));
       }
 
       // ════════════════════════════════════════════════════════════
@@ -1469,6 +1547,22 @@
           tplDataSheetName = dataSheetName;
           tplActive = true;
 
+          // Capture the reference layout (header columns) so the RO-per-sheet
+          // output follows the user's template instead of a fixed layout.
+          try {
+            const ref = parseTemplateRefSheet(wb);
+            if (ref) {
+              tplRefColumns = ref.columns;
+              tplRefSheetName = ref.sheetName;
+            } else {
+              tplRefColumns = [];
+              tplRefSheetName = null;
+            }
+          } catch (_) {
+            tplRefColumns = [];
+            tplRefSheetName = null;
+          }
+
           tplZone.classList.add("hidden");
           $("tpl-selected").classList.remove("hidden");
           $("tpl-file-name").textContent = f.name;
@@ -1532,6 +1626,8 @@
         tplFile = tplDistOrder = null;
         tplMonths = [];
         tplDataSheetName = null;
+        tplRefColumns = [];
+        tplRefSheetName = null;
         tplActive = false;
         tplZone.classList.remove("hidden");
         $("tpl-selected").classList.add("hidden");
@@ -2021,8 +2117,16 @@
         const list = $("col-list");
         list.innerHTML = "";
         if (tplActive) {
+          const refInfo =
+            tplRefColumns && tplRefColumns.length
+              ? ` Layout output mengikuti sheet acuan <strong>${esc(tplRefSheetName || "")}</strong> (${tplRefColumns.length} kolom: ${tplRefColumns
+                  .map((c) => esc(c.header))
+                  .join(", ")}).`
+              : " (Sheet acuan kolom tidak terdeteksi — memakai layout default.)";
           $("col-section-desc").innerHTML =
-            "Mode <strong>Template RO</strong> aktif — output per distributor mengikuti format acuan. Kolom di bawah hanya untuk export format flat.";
+            "Mode <strong>Template RO</strong> aktif — output per distributor mengikuti format acuan." +
+            refInfo +
+            " Kolom di bawah hanya untuk export format flat.";
         } else {
           $("col-section-desc").textContent =
             "Seret untuk mengubah urutan. Toggle untuk menyembunyikan kolom dari hasil export.";
@@ -2143,13 +2247,10 @@
           });
           if (data.length > 1) {
             const hn = (data[0] || []).map((v) =>
-              String(v || "")
-                .toLowerCase()
-                .replace(/[^a-z0-9]/g, ""),
+              String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
             );
             const findCol = (exact, partial, avoid) => {
-              const banned = (i) =>
-                (avoid || []).some((a) => hn[i].includes(a));
+              const banned = (i) => (avoid || []).some((a) => hn[i].includes(a));
               for (const a of exact) {
                 const i = hn.findIndex((h, j) => h === a && !banned(j));
                 if (i >= 0) return i;
@@ -2164,16 +2265,13 @@
               ["namapelanggan", "namacustomer", "nmcust"],
               ["pelanggan", "customer"],
             );
-            const brgIdx = findCol(
-              ["namabarang", "namaproduk"],
-              ["namabarang"],
-            );
-            const qtyIdx = findCol(
-              ["kuantitas", "qty"],
-              ["kuantitas", "qty"],
-              ["jumlahrp"],
-            );
-            const satIdx = findCol(["satuan", "sat"], ["satuan"], ["hargasat"]);
+            const brgIdx = findCol(["namabarang", "namaproduk"], ["namabarang"]);
+            const qtyIdx = findCol(["kuantitas", "qty"], ["kuantitas", "qty"], [
+              "jumlahrp",
+            ]);
+            const satIdx = findCol(["satuan", "sat"], ["satuan"], [
+              "hargasat",
+            ]);
             const jmlIdx = findCol(
               ["dpp", "penjualan", "neto", "subtotal"],
               ["dpp", "penjualan"],
@@ -2834,14 +2932,46 @@
 
         // Build index: dist → [rowKey] → monthName → value sum
         // rowKey is composite of selected rowFields (e.g. "dist|salesman|cust")
-        // For RO output: group by the row dimension fields defined in roOutputConfig
-        const rowFields = roOutputConfig.rowFields.includes("cust")
-          ? roOutputConfig.rowFields
-          : [...roOutputConfig.rowFields, "cust"]; // cust always included
-        const valueField = roOutputConfig.valueField || "qty";
+        // When a template reference layout is present, the row-dimension fields
+        // are taken from the template's identity columns (everything that is
+        // not a month column and not the value column). Otherwise use the
+        // user's roOutputConfig selection.
+        const valueMode = roOutputConfig.valueMode || "value";
+        let rowFields, valueSlot;
+        if (tplRefColumns && tplRefColumns.length) {
+          // Identity (row) columns from template: dist/salesman/cust/barang/satuan
+          const idSlots = tplRefColumns
+            .filter((c) => !c.isMonth && c.slot && c.slot !== "bulan")
+            .map((c) => c.slot)
+            .filter((s) => s !== "qty" && s !== "jumlah");
+          rowFields = idSlots.length ? Array.from(new Set(idSlots)) : ["cust"];
+          // value column: prefer an explicit qty/jumlah column in the template
+          const valCol = tplRefColumns.find(
+            (c) => c.slot === "jumlah" || c.slot === "qty",
+          );
+          valueSlot =
+            valueMode === "ro"
+              ? "cust"
+              : valCol
+                ? valCol.slot
+                : roOutputConfig.valueField || "qty";
+        } else {
+          rowFields = roOutputConfig.rowFields.includes("cust")
+            ? roOutputConfig.rowFields
+            : [...roOutputConfig.rowFields, "cust"]; // cust always included
+          valueSlot =
+            valueMode === "ro" ? "cust" : roOutputConfig.valueField || "qty";
+        }
+        // Ensure cust is present when counting RO (RO = distinct customers)
+        if (valueMode === "ro" && !rowFields.includes("cust"))
+          rowFields = [...rowFields, "cust"];
+        const valueField = valueSlot;
 
-        // Helper: get display value (qty or jumlah)
+        // Helper: get display value.
+        //  • value mode → numeric qty/jumlah
+        //  • RO mode    → 1 per transacting row (distinct customers summed later)
         const getVal = (row) => {
+          if (valueMode === "ro") return 1;
           const v = row[valueField];
           return typeof v === "number" ? v : parseFloat(v) || 0;
         };
@@ -2979,21 +3109,149 @@
 
           const wsData = [];
 
+          // Helper: sum value for a row-key in a given period month
+          const cellValue = (rk, pm) => {
+            const val = custData[rk];
+            if (!val) return null;
+            const pmNorm = pm.toUpperCase().trim();
+            const key = Object.keys(val).find((k) => {
+              const kNorm = k.toUpperCase().trim();
+              return (
+                kNorm === pmNorm ||
+                kNorm.startsWith(pmNorm.slice(0, 3)) ||
+                pmNorm.startsWith(kNorm.slice(0, 3))
+              );
+            });
+            if (!key) return null;
+            const raw = val[key];
+            // RO mode: a customer either transacted (1) or not
+            if (valueMode === "ro") return raw > 0 ? 1 : null;
+            return raw;
+          };
+          const monthTotal = (pm) => {
+            let total = 0;
+            rowKeys.forEach((rk) => {
+              const v = cellValue(rk, pm);
+              if (v) total += v; // RO: counts distinct customers (each contributes 1)
+            });
+            return total > 0 ? total : null;
+          };
+
+          const monthLabels = months.map((m) => getMonthLabel(m));
+
+          if (tplRefColumns && tplRefColumns.length) {
+            // ── TEMPLATE-DRIVEN LAYOUT ──
+            // Follow the exact columns from the user's uploaded template.
+            // Month columns are expanded into one column per period month.
+            // A single "BULAN" slot column (no explicit month headers) is also
+            // expanded into the period months.
+            const monthCols = tplRefColumns.filter((c) => c.isMonth);
+            const expandMonths = monthCols.length <= 1; // expand if 0/1 month col
+
+            // Header row (single row, exactly like the template)
+            const headerRow = [];
+            tplRefColumns.forEach((c) => {
+              if (c.isMonth && expandMonths) {
+                monthLabels.forEach((ml) => headerRow.push(ml));
+              } else {
+                headerRow.push(c.header);
+              }
+            });
+            // Distributor title above the table (kept for readability)
+            wsData.push([displayName]);
+            wsData.push(headerRow);
+
+            const pushRow = (meta, isTotal) => {
+              const out = [];
+              tplRefColumns.forEach((c) => {
+                if (c.isMonth && expandMonths) {
+                  months.forEach((pm) =>
+                    out.push(
+                      isTotal ? monthTotal(pm) : cellValue(meta.__rk, pm),
+                    ),
+                  );
+                } else if (c.isMonth) {
+                  // explicit single month header in template
+                  const pm =
+                    months.find(
+                      (m) =>
+                        m.toUpperCase().slice(0, 3) ===
+                        normHdr(c.header).slice(0, 3).toUpperCase(),
+                    ) || months[0];
+                  out.push(isTotal ? monthTotal(pm) : cellValue(meta.__rk, pm));
+                } else if (c.slot === "dist") {
+                  out.push(isTotal ? "" : displayName);
+                } else if (c.slot === "bulan") {
+                  out.push(""); // bulan represented by month columns
+                } else if (c.slot === "qty" || c.slot === "jumlah") {
+                  // a value column with no month dimension → row grand total
+                  if (isTotal) {
+                    let t = 0;
+                    months.forEach((pm) => {
+                      const v = cellValue(meta.__rk, pm);
+                      if (v) t += v;
+                    });
+                    out.push(t || null);
+                  } else {
+                    let t = 0;
+                    months.forEach((pm) => {
+                      const v = cellValue(meta.__rk, pm);
+                      if (v) t += v;
+                    });
+                    out.push(t || null);
+                  }
+                } else if (c.slot) {
+                  out.push(isTotal ? "" : meta[c.slot] || "");
+                } else {
+                  out.push(isTotal ? "" : ""); // unrecognized template column
+                }
+              });
+              return out;
+            };
+
+            if (rowKeys.length > 0) {
+              rowKeys.forEach((rk) => {
+                const meta = Object.assign({ __rk: rk }, metaData[rk] || {});
+                wsData.push(pushRow(meta, false));
+              });
+            } else {
+              const empty = tplRefColumns.map((c, i) =>
+                i === 0 ? "(tidak ada data)" : null,
+              );
+              wsData.push(empty);
+            }
+            // TOTAL row
+            wsData.push(pushRow({ __rk: null }, true));
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws["!cols"] = tplRefColumns.flatMap((c) => {
+              if (c.isMonth && expandMonths)
+                return months.map(() => ({ wch: 12 }));
+              if (c.slot === "cust") return [{ wch: 36 }];
+              if (c.slot === "dist") return [{ wch: 30 }];
+              if (c.slot === "barang") return [{ wch: 30 }];
+              return [{ wch: 18 }];
+            });
+            const sheetName = displayName
+              .replace(/[\\\/\?\*\[\]]/g, "")
+              .slice(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName || "Dist");
+            return; // next distributor
+          }
+
+          // ── DEFAULT BUILT-IN LAYOUT (no template uploaded) ──
           // Row 1: Distributor name
           wsData.push([displayName]);
-
-          // Build header columns based on rowFields
           const nonDistHdr = nonDistFields.map((f) => {
             if (f === "cust") return "NAMA CUSTOMER";
             if (f === "salesman") return "NAMA SALESMAN";
+            if (f === "barang") return "NAMA BARANG";
+            if (f === "satuan") return "SATUAN";
             return f.toUpperCase();
           });
           const distHdr = rowFields.includes("dist")
             ? ["NAMA DB / DISTRIBUTOR"]
             : [];
-
-          // Row 2: group headers (NO | row-dimension cols | BULAN spanning)
-          const monthLabels = months.map((m) => getMonthLabel(m));
           wsData.push([
             "NO",
             ...distHdr,
@@ -3008,25 +3266,12 @@
             ...monthLabels,
           ]);
 
-          // Customer/row data
           if (rowKeys.length > 0) {
             rowKeys.forEach((rk, i) => {
               const meta = metaData[rk] || {};
               const distVal = rowFields.includes("dist") ? [displayName] : [];
               const nonDistVals = nonDistFields.map((f) => meta[f] || "");
-              const monthVals = months.map((pm) => {
-                const pmNorm = pm.toUpperCase().trim();
-                const val = custData[rk];
-                const key = Object.keys(val).find((k) => {
-                  const kNorm = k.toUpperCase().trim();
-                  return (
-                    kNorm === pmNorm ||
-                    kNorm.startsWith(pmNorm.slice(0, 3)) ||
-                    pmNorm.startsWith(kNorm.slice(0, 3))
-                  );
-                });
-                return key ? val[key] : null;
-              });
+              const monthVals = months.map((pm) => cellValue(rk, pm));
               wsData.push([i + 1, ...distVal, ...nonDistVals, ...monthVals]);
             });
           } else {
@@ -3042,7 +3287,6 @@
             ]);
           }
 
-          // Summary row: total per bulan
           const extraColsBefore =
             (rowFields.includes("dist") ? 1 : 0) + nonDistFields.length;
           const totalRow = [
@@ -3050,27 +3294,10 @@
             ...Array(extraColsBefore)
               .fill("")
               .map((_, i) => (i === extraColsBefore - 1 ? "TOTAL" : "")),
-            ...months.map((pm) => {
-              let total = 0;
-              rowKeys.forEach((rk) => {
-                const pmNorm = pm.toUpperCase().trim();
-                const val = custData[rk];
-                const key = Object.keys(val).find((k) => {
-                  const kNorm = k.toUpperCase().trim();
-                  return (
-                    kNorm === pmNorm ||
-                    kNorm.startsWith(pmNorm.slice(0, 3)) ||
-                    pmNorm.startsWith(kNorm.slice(0, 3))
-                  );
-                });
-                if (key) total += val[key];
-              });
-              return total > 0 ? total : null;
-            }),
+            ...months.map((pm) => monthTotal(pm)),
           ];
           wsData.push(totalRow);
 
-          // Create sheet
           const ws = XLSX.utils.aoa_to_sheet(wsData);
           const fixedCols = [
             { wch: 5 },
@@ -3117,7 +3344,11 @@
                   pmNorm.startsWith(kNorm.slice(0, 3))
                 );
               });
-              if (key) total += monthMap[key];
+              if (key) {
+                // RO mode: each transacting customer counts as 1 (distinct
+                // outlet), regardless of how many transactions/qty it had.
+                total += valueMode === "ro" ? (monthMap[key] > 0 ? 1 : 0) : monthMap[key];
+              }
             });
             return total || null;
           });
@@ -3235,6 +3466,8 @@
         tplMonths = [];
         tplActive = false;
         tplDataSheetName = null;
+        tplRefColumns = [];
+        tplRefSheetName = null;
         periodMode = "auto";
         targetMonthIdx = -1;
         activePeriodMonths = [];
@@ -4000,17 +4233,7 @@
       //             last resort for Bravo, never a rupiah column.
       const COL_RULES = {
         cust: {
-          exact: [
-            "namacustomer",
-            "namapelanggan",
-            "nmcust",
-            "customer",
-            "pelanggan",
-            "namatoko",
-            "listcustomer",
-            "custnm",
-            "namacust",
-          ],
+          exact: ["namacustomer", "namapelanggan", "nmcust", "customer", "pelanggan", "namatoko", "listcustomer", "custnm", "namacust"],
           partial: ["pelanggan", "customer", "namatoko", "outlet"],
           avoid: ["kodecustomer", "kodecust", "custid", "kodepelanggan"],
         },
@@ -4020,87 +4243,27 @@
           avoid: [],
         },
         barang: {
-          exact: [
-            "namabarang",
-            "namaproduk",
-            "namaproduct",
-            "nmbrg",
-            "nmbarang",
-            "namaitem",
-            "nmproduk",
-            "namabrg",
-          ],
+          exact: ["namabarang", "namaproduk", "namaproduct", "nmbrg", "nmbarang", "namaitem", "nmproduk", "namabrg"],
           partial: ["namabarang", "namaproduk", "namaproduct", "namaitem"],
           avoid: [],
         },
         qty: {
-          exact: [
-            "qtysoldtotalpcs",
-            "qty",
-            "kuantitas",
-            "qtyfaktur",
-            "quantity",
-            "qyt",
-            "jumlah",
-          ],
+          exact: ["qtysoldtotalpcs", "qty", "kuantitas", "qtyfaktur", "quantity", "qyt", "jumlah"],
           partial: ["kuantitas", "qtytotalpcs", "qty"],
-          avoid: [
-            "jumlahrp",
-            "jumlahrupiah",
-            "qtysoldcrt",
-            "qtysolduom1",
-            "qtysolduom2",
-            "qtysolduom3",
-            "qtyorder",
-            "qtyterbesar",
-            "qtyterkecil",
-          ],
+          avoid: ["jumlahrp", "jumlahrupiah", "qtysoldcrt", "qtysolduom1", "qtysolduom2", "qtysolduom3", "qtyorder", "qtyterbesar", "qtyterkecil"],
         },
         satuan: {
           exact: ["satuan", "sat", "uom", "unit", "satuanfaktur"],
           partial: ["satuan", "unit"],
-          avoid: [
-            "satuanterbesar",
-            "satuanterkecil",
-            "hgsatuan",
-            "hargasatuan",
-            "hargasat",
-          ],
+          avoid: ["satuanterbesar", "satuanterkecil", "hgsatuan", "hargasatuan", "hargasat"],
         },
         jumlah: {
-          exact: [
-            "dpp",
-            "dppvalue",
-            "neto",
-            "netto",
-            "netamount",
-            "subtotal",
-            "subtotalrp",
-            "nilai",
-            "jumlahrupiah",
-          ],
+          exact: ["dpp", "dppvalue", "neto", "netto", "netamount", "subtotal", "subtotalrp", "nilai", "jumlahrupiah"],
           partial: ["dpp", "neto", "subtotal"],
-          avoid: [
-            "disc",
-            "diskon",
-            "ppn",
-            "potongan",
-            "hargasat",
-            "hargasatuan",
-          ],
+          avoid: ["disc", "diskon", "ppn", "potongan", "hargasat", "hargasatuan"],
         },
         salesman: {
-          exact: [
-            "namasalesman",
-            "namasales",
-            "salesman",
-            "nmsales",
-            "sales",
-            "penjual",
-            "namatenagapenjual",
-            "kodesalesman",
-            "nmslm",
-          ],
+          exact: ["namasalesman", "namasales", "salesman", "nmsales", "sales", "penjual", "namatenagapenjual", "kodesalesman", "nmslm"],
           partial: ["salesman", "namasales", "penjual", "tenagapenjual"],
           avoid: [],
         },
@@ -4114,6 +4277,97 @@
         String(s || "")
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "");
+
+      // Map a single template header cell to a data field slot.
+      // Reuses the same vocabulary as DB column detection so the template can
+      // use any wording ("NAMA CUSTOMER", "Pelanggan", "DPP", "Nilai", ...).
+      function headerToSlot(header) {
+        const h = normHdr(header);
+        if (!h) return null;
+        const MONTHS_RE =
+          /^(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec|januari|februari|maret|april|juni|juli|agustus|september|oktober|november|desember)/;
+        const tests = [
+          ["dist", /(namadistributor|distributor|namadb)/],
+          ["salesman", /(salesman|namasales|tenagapenjual|penjual|sales)/],
+          ["cust", /(namacustomer|namapelanggan|customer|pelanggan|namatoko|outlet)/],
+          ["bulan", /(bulan|periode|month)/],
+          ["barang", /(namabarang|namaproduk|namaproduct|barang|produk|item)/],
+          ["satuan", /(satuan|^sat$|uom|unit)/],
+          ["qty", /(qty|kuantitas|quantity)/],
+          ["jumlah", /(dpp|jumlah|nilai|neto|netto|subtotal|amount|total|nominal|rupiah|value)/],
+        ];
+        for (const [slot, re] of tests) if (re.test(h)) return slot;
+        return null;
+      }
+
+      // Detect the template's REFERENCE sheet (the one whose single header row
+      // defines the desired output columns) and map each header to a slot.
+      // Heuristic: the reference sheet is a flat header table — it contains a
+      // customer/pelanggan column AND has little or no data below the header
+      // (it is a layout spec, not a filled report). Falls back to any sheet
+      // whose header has the most recognizable data slots.
+      function parseTemplateRefSheet(wb) {
+        let best = null;
+        let bestScore = -1;
+        wb.SheetNames.forEach((sn) => {
+          const ws = wb.Sheets[sn];
+          if (!ws || !ws["!ref"]) return;
+          const data = XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: null,
+            raw: true,
+          });
+          // Find the header row: first row with ≥3 non-empty string cells
+          let hdrRow = -1;
+          for (let r = 0; r < Math.min(data.length, 8); r++) {
+            const row = data[r] || [];
+            const textCells = row.filter(
+              (v) => typeof v === "string" && v.trim().length > 1,
+            ).length;
+            if (textCells >= 3) {
+              hdrRow = r;
+              break;
+            }
+          }
+          if (hdrRow < 0) return;
+          const header = (data[hdrRow] || []).map((v) =>
+            v == null ? "" : String(v).trim(),
+          );
+          // Trim trailing empties
+          while (header.length && !header[header.length - 1]) header.pop();
+          const slots = header.map((h) => headerToSlot(h));
+          const recognized = slots.filter((s) => s).length;
+          const hasCust = slots.includes("cust");
+          // Count data rows below the header
+          const dataRows = data
+            .slice(hdrRow + 1)
+            .filter((r) => (r || []).some((v) => v != null && v !== "")).length;
+          // Prefer: recognizes many slots, HAS a customer col, FEW data rows
+          // (a pure layout/header sheet). Penalize sheets full of data.
+          const score =
+            recognized * 10 +
+            (hasCust ? 25 : 0) -
+            Math.min(dataRows, 50) * 0.5;
+          if (score > bestScore && recognized >= 3 && hasCust) {
+            bestScore = score;
+            best = { sheetName: sn, header, slots, hdrRow };
+          }
+        });
+        if (!best) return null;
+        // Build tplRefColumns: month columns are those headers that look like a
+        // month, OR (if none) we mark a single "bulan" slot column for later
+        // per-month expansion.
+        const cols = best.header.map((h, i) => {
+          const slot = best.slots[i];
+          const isMonth =
+            slot === "bulan" ||
+            /^(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)/.test(
+              normHdr(h),
+            );
+          return { header: h, slot: slot, isMonth: isMonth };
+        });
+        return { sheetName: best.sheetName, columns: cols };
+      }
 
       // Fuzzy sheet name matcher (for DB file → template sheet)
       function matchSheetToTemplate(dbName, tplSheets) {
@@ -4328,20 +4582,14 @@
 
         // Assign value/identity slots first so each reserves its column,
         // preventing a later slot from stealing it.
-        [
-          "jumlah",
-          "qty",
-          "satuan",
-          "barang",
-          "cust",
-          "salesman",
-          "bulan",
-        ].forEach((slot) => {
-          let idx = matchRule(COL_RULES[slot]);
-          if (slot === "barang" && idx < 0) idx = matchRule(BARANG_KODE);
-          map[slot] = idx;
-          if (idx >= 0) used.add(idx);
-        });
+        ["jumlah", "qty", "satuan", "barang", "cust", "salesman", "bulan"].forEach(
+          (slot) => {
+            let idx = matchRule(COL_RULES[slot]);
+            if (slot === "barang" && idx < 0) idx = matchRule(BARANG_KODE);
+            map[slot] = idx;
+            if (idx >= 0) used.add(idx);
+          },
+        );
 
         // Bulan fallback: no month-text column → use a date/tanggal column
         // (converted to month name later during extraction).
