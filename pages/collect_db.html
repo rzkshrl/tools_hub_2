@@ -831,6 +831,20 @@
                   Kolom standar: Distributor, Customer, Bulan, Barang, QTY...
                 </div>
               </button>
+              <button
+                class="export-mode-btn"
+                id="emb-flatdist"
+                onclick="selectExportMode('flatdist')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-layout-list" style="font-size: 14px"></i>
+                  Gabungan per Distributor (ikut template)
+                </div>
+                <div class="emb-desc">
+                  1 sheet per distributor, data mentah, kolom mengikuti sheet
+                  acuan template — tanpa hitung RO
+                </div>
+              </button>
             </div>
           </div>
 
@@ -1116,6 +1130,8 @@
         exportMode = mode;
         $("emb-template").classList.toggle("selected", mode === "template");
         $("emb-flat").classList.toggle("selected", mode === "flat");
+        const ef = $("emb-flatdist");
+        if (ef) ef.classList.toggle("selected", mode === "flatdist");
       }
 
       // RO output: switch between counting outlets (RO) and summing a metric.
@@ -3432,11 +3448,206 @@
       }
 
       // ════════════════════════════════════════════════════════════
+      //  EXPORT — FLAT PER DISTRIBUTOR (follow template, raw data, no RO)
+      // ════════════════════════════════════════════════════════════
+      // One sheet per distributor. Each transaction row is emitted AS-IS into
+      // the columns defined by the uploaded template's reference sheet
+      // (tplRefColumns), in that order. BULAN is filled with the month name of
+      // each row (NOT pivoted, NOT counted). Any data field not present in the
+      // template is appended as an extra column. The selected period only
+      // filters which rows are included.
+      function buildFlatPerDistWorkbook() {
+        const wb = XLSX.utils.book_new();
+        const ALL_FIELDS = [
+          "dist",
+          "salesman",
+          "cust",
+          "bulan",
+          "barang",
+          "qty",
+          "satuan",
+          "jumlah",
+        ];
+        const FIELD_LABEL = {
+          dist: "NAMA DISTRIBUTOR",
+          salesman: "NAMA SALESMAN",
+          cust: "NAMA CUSTOMER",
+          bulan: "BULAN",
+          barang: "NAMA BARANG",
+          qty: "QTY",
+          satuan: "SAT",
+          jumlah: "DPP",
+        };
+
+        // 1) Build the column plan from the template (fallback: all fields)
+        let colPlan; // [{ header, field }]
+        if (tplRefColumns && tplRefColumns.length) {
+          const usedFields = new Set();
+          colPlan = tplRefColumns.map((c) => {
+            if (c.slot) usedFields.add(c.slot);
+            return { header: c.header, field: c.slot || null };
+          });
+          // "Kolom template + kolom lain dari data kalau ada"
+          ALL_FIELDS.forEach((f) => {
+            if (!usedFields.has(f)) {
+              // only append if some row actually has a value for it
+              const hasData = resultData.some(
+                (r) => r[f] != null && String(r[f]).trim() !== "",
+              );
+              if (hasData) colPlan.push({ header: FIELD_LABEL[f], field: f });
+            }
+          });
+        } else {
+          colPlan = ALL_FIELDS.map((f) => ({
+            header: FIELD_LABEL[f],
+            field: f,
+          }));
+        }
+
+        // 2) Period filter (same semantics as flat export)
+        let periodData;
+        if (activePeriodMonths.length > 0) {
+          const pmNorms = new Set(
+            activePeriodMonths.map((m) => m.toUpperCase().trim()),
+          );
+          const pmPrefixes = new Set([...pmNorms].map((m) => m.slice(0, 3)));
+          const cache = new Map();
+          const inPeriod = (bulan) => {
+            if (!bulan) return false;
+            if (cache.has(bulan)) return cache.get(bulan);
+            const b = bulan.toUpperCase().trim();
+            const result =
+              pmNorms.has(b) ||
+              pmPrefixes.has(b.slice(0, 3)) ||
+              [...pmNorms].some((pm) => pm.startsWith(b.slice(0, 3)));
+            cache.set(bulan, result);
+            return result;
+          };
+          periodData = resultData.filter((r) => inPeriod(r.bulan));
+        } else {
+          periodData = resultData;
+        }
+
+        // 3) Group rows by distributor
+        const byDist = {};
+        periodData.forEach((r) => {
+          const d = (r.dist || "").trim() || "(tanpa nama)";
+          (byDist[d] = byDist[d] || []).push(r);
+        });
+        const dataDistKeys = Object.keys(byDist);
+
+        // Reuse the same fuzzy matcher used by RO mode for dist ordering
+        const norm = (s) =>
+          String(s || "")
+            .toUpperCase()
+            .replace(/[,.\-_]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        const fuzzy = (name, keys) => {
+          const nt = norm(name);
+          let f = keys.find((k) => norm(k) === nt);
+          if (f) return f;
+          f = keys.find((k) => nt.includes(norm(k)) || norm(k).includes(nt));
+          if (f) return f;
+          const tw = new Set(nt.split(" ").filter((w) => w.length > 3));
+          let best = null,
+            bs = 0;
+          keys.forEach((k) => {
+            const ov = norm(k)
+              .split(" ")
+              .filter((w) => w.length > 3)
+              .filter((w) => tw.has(w)).length;
+            if (ov > bs) {
+              bs = ov;
+              best = k;
+            }
+          });
+          return bs > 0 ? best : null;
+        };
+
+        // Order: template distributor order first, then any extras from data
+        const distOrder = [];
+        const used = new Set();
+        if (tplActive && tplDistOrder.length) {
+          tplDistOrder.forEach((tplName) => {
+            const key = fuzzy(tplName, dataDistKeys);
+            distOrder.push({ displayName: tplName, dataKey: key });
+            if (key) used.add(key);
+          });
+        } else {
+          Array.from(selectedDBs).forEach((shortName) => {
+            const key = fuzzy(shortName, dataDistKeys);
+            distOrder.push({ displayName: shortName, dataKey: key });
+            if (key) used.add(key);
+          });
+        }
+        dataDistKeys
+          .filter((k) => !used.has(k))
+          .forEach((k) => distOrder.push({ displayName: k, dataKey: k }));
+
+        // 4) Emit one sheet per distributor
+        const usedSheetNames = new Set();
+        const cellFor = (row, field) => {
+          if (!field) return "";
+          const v = row[field];
+          if (v == null) return "";
+          if (field === "qty" || field === "jumlah")
+            return typeof v === "number" ? v : parseFloat(v) || "";
+          return String(v).trim();
+        };
+        distOrder.forEach(({ displayName, dataKey }) => {
+          const rows = dataKey ? byDist[dataKey] || [] : [];
+          const aoa = [colPlan.map((c) => c.header)];
+          if (rows.length) {
+            rows.forEach((r) =>
+              aoa.push(colPlan.map((c) => cellFor(r, c.field))),
+            );
+          } else {
+            aoa.push(
+              colPlan.map((c, i) => (i === 0 ? "(tidak ada data)" : "")),
+            );
+          }
+          const ws = XLSX.utils.aoa_to_sheet(aoa);
+          ws["!cols"] = colPlan.map((c) => {
+            if (c.field === "barang") return { wch: 40 };
+            if (c.field === "cust") return { wch: 32 };
+            if (c.field === "dist") return { wch: 28 };
+            if (c.field === "salesman") return { wch: 22 };
+            if (c.field === "bulan") return { wch: 14 };
+            if (c.field === "qty" || c.field === "jumlah") return { wch: 14 };
+            if (c.field === "satuan") return { wch: 10 };
+            return { wch: 18 };
+          });
+          // Unique, Excel-safe sheet name (max 31 chars)
+          let base =
+            displayName.replace(/[\\\/\?\*\[\]:]/g, "").slice(0, 31) || "Dist";
+          let name = base,
+            n = 2;
+          while (usedSheetNames.has(name)) {
+            const suf = " (" + n++ + ")";
+            name = base.slice(0, 31 - suf.length) + suf;
+          }
+          usedSheetNames.add(name);
+          XLSX.utils.book_append_sheet(wb, ws, name);
+        });
+
+        if (wb.SheetNames.length === 0) {
+          const ws = XLSX.utils.aoa_to_sheet([
+            colPlan.map((c) => c.header),
+            ["(tidak ada data)"],
+          ]);
+          XLSX.utils.book_append_sheet(wb, ws, "COLLECT DB");
+        }
+        return wb;
+      }
+
+      // ════════════════════════════════════════════════════════════
       //  EXPORT BUTTON
       // ════════════════════════════════════════════════════════════
       $("btn-export").addEventListener("click", () => {
         let wb;
         if (exportMode === "flat") wb = buildFlatWorkbook();
+        else if (exportMode === "flatdist") wb = buildFlatPerDistWorkbook();
         else wb = buildROWorkbook();
 
         const now = new Date();
@@ -3448,7 +3659,12 @@
                 .map((m) => m.slice(0, 3).toUpperCase())
                 .join("-")
             : "";
-        const suffix = exportMode === "flat" ? "_FLAT" : "_RO";
+        const suffix =
+          exportMode === "flat"
+            ? "_FLAT"
+            : exportMode === "flatdist"
+              ? "_FLAT-PER-DIST"
+              : "_RO";
         XLSX.writeFile(wb, `COLLECT_DB${suffix}${monthLabel}_${ts}.xlsx`);
       });
 
