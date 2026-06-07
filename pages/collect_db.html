@@ -2295,6 +2295,10 @@
             );
             const blnTextIdx = findCol(["bulan", "bln"], ["bulan"]);
             const tglIdx = findCol(["tanggal", "tgl"], ["tanggal", "tgl"]);
+            // Branch/cabang column (e.g. SAJ Group has many "SAJ GRESIK",
+            // "SAJ MOJOKERTO" branches in ONE file). When present each row
+            // carries its real branch so per-branch templates map correctly.
+            const cabangIdx = findCol(["cabang", "branch"], ["cabang"]);
 
             if (custIdx >= 0 && brgIdx >= 0) {
               rows = data
@@ -2304,7 +2308,7 @@
                   let bulan = blnTextIdx >= 0 ? str(col(r, blnTextIdx)) : "";
                   if (!bulan && tglIdx >= 0)
                     bulan = getMonthName(xlsxDateToJS(col(r, tglIdx)));
-                  return {
+                  const o = {
                     dist: distName,
                     cust: str(col(r, custIdx)),
                     bulan: bulan,
@@ -2313,6 +2317,11 @@
                     satuan: satIdx >= 0 ? str(col(r, satIdx)) : "",
                     jumlah: jmlIdx >= 0 ? col(r, jmlIdx) : null,
                   };
+                  if (cabangIdx >= 0) {
+                    const cb = str(col(r, cabangIdx));
+                    if (cb) o.cabang = cb;
+                  }
+                  return o;
                 })
                 .filter((r) => r.cust && r.barang);
               if (rows.length > 0) return rows;
@@ -2327,6 +2336,7 @@
                 if (isSAJ)
                   return {
                     dist: distName,
+                    cabang: str(col(r, 0)) || undefined,
                     cust: str(col(r, 5)),
                     bulan: getMonthName(xlsxDateToJS(col(r, 3))),
                     barang: str(col(r, 6)),
@@ -3003,7 +3013,7 @@
         const rowKeyMeta = {}; // dist → rowKey → {cust, salesman, dist}
         resultData.forEach((row) => {
           if (!monthInPeriod(row.bulan)) return;
-          const d = row.dist || "";
+          const d = distGroupKey(row); // branch-aware (SAJ branches split out)
           const b = row.bulan || "";
           const q = getVal(row);
           // Build row key from non-dist fields
@@ -3024,36 +3034,9 @@
           dataIdx[d][rowKey][b] = (dataIdx[d][rowKey][b] || 0) + q;
         });
 
-        // Fuzzy match distributor names
-        function fuzzyMatch(tplName, dataKeys) {
-          const norm = (s) =>
-            s
-              .toUpperCase()
-              .replace(/[,.\-_]/g, " ")
-              .replace(/\s+/g, " ")
-              .trim();
-          const nt = norm(tplName);
-          let found = dataKeys.find((k) => norm(k) === nt);
-          if (found) return found;
-          found = dataKeys.find(
-            (k) => nt.includes(norm(k)) || norm(k).includes(nt),
-          );
-          if (found) return found;
-          const tWords = new Set(nt.split(" ").filter((w) => w.length > 3));
-          let best = null,
-            bestScore = 0;
-          dataKeys.forEach((k) => {
-            const kWords = norm(k)
-              .split(" ")
-              .filter((w) => w.length > 3);
-            const overlap = kWords.filter((w) => tWords.has(w)).length;
-            if (overlap > bestScore) {
-              bestScore = overlap;
-              best = k;
-            }
-          });
-          return bestScore > 0 ? best : null;
-        }
+        // Distributor name matcher (branch-aware, threshold-guarded)
+        const fuzzyMatch = (tplName, dataKeys) =>
+          matchDistKey(tplName, dataKeys);
 
         // Build the ordered list of distributors to produce sheets for
         const dataDistKeys = Object.keys(dataIdx);
@@ -3528,55 +3511,26 @@
           periodData = resultData;
         }
 
-        // 3) Group rows by distributor
+        // 3) Group rows by distributor (branch-aware)
         const byDist = {};
         periodData.forEach((r) => {
-          const d = (r.dist || "").trim() || "(tanpa nama)";
+          const d = distGroupKey(r);
           (byDist[d] = byDist[d] || []).push(r);
         });
         const dataDistKeys = Object.keys(byDist);
-
-        // Reuse the same fuzzy matcher used by RO mode for dist ordering
-        const norm = (s) =>
-          String(s || "")
-            .toUpperCase()
-            .replace(/[,.\-_]/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-        const fuzzy = (name, keys) => {
-          const nt = norm(name);
-          let f = keys.find((k) => norm(k) === nt);
-          if (f) return f;
-          f = keys.find((k) => nt.includes(norm(k)) || norm(k).includes(nt));
-          if (f) return f;
-          const tw = new Set(nt.split(" ").filter((w) => w.length > 3));
-          let best = null,
-            bs = 0;
-          keys.forEach((k) => {
-            const ov = norm(k)
-              .split(" ")
-              .filter((w) => w.length > 3)
-              .filter((w) => tw.has(w)).length;
-            if (ov > bs) {
-              bs = ov;
-              best = k;
-            }
-          });
-          return bs > 0 ? best : null;
-        };
 
         // Order: template distributor order first, then any extras from data
         const distOrder = [];
         const used = new Set();
         if (tplActive && tplDistOrder.length) {
           tplDistOrder.forEach((tplName) => {
-            const key = fuzzy(tplName, dataDistKeys);
+            const key = matchDistKey(tplName, dataDistKeys);
             distOrder.push({ displayName: tplName, dataKey: key });
             if (key) used.add(key);
           });
         } else {
           Array.from(selectedDBs).forEach((shortName) => {
-            const key = fuzzy(shortName, dataDistKeys);
+            const key = matchDistKey(shortName, dataDistKeys);
             distOrder.push({ displayName: shortName, dataKey: key });
             if (key) used.add(key);
           });
@@ -3595,12 +3549,19 @@
             return typeof v === "number" ? v : parseFloat(v) || "";
           return String(v).trim();
         };
+        const cellForWithDist = (row, field, displayName) => {
+          // The NAMA DISTRIBUTOR column shows the sheet's distributor name
+          // (the template/branch name), not the raw file name — so a branch
+          // sheet like "CV SEJAHTERA ABADI JAYA - GRESIK" reads consistently.
+          if (field === "dist") return displayName;
+          return cellFor(row, field);
+        };
         distOrder.forEach(({ displayName, dataKey }) => {
           const rows = dataKey ? byDist[dataKey] || [] : [];
           const aoa = [colPlan.map((c) => c.header)];
           if (rows.length) {
             rows.forEach((r) =>
-              aoa.push(colPlan.map((c) => cellFor(r, c.field))),
+              aoa.push(colPlan.map((c) => cellForWithDist(r, c.field, displayName))),
             );
           } else {
             aoa.push(
@@ -4494,6 +4455,85 @@
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "");
 
+      // ── Distributor grouping & matching (shared by RO + flat-per-dist) ──
+      // Rows may carry a `cabang` (branch) when one file contains several
+      // branches (e.g. SAJ Group → SAJ GRESIK, SAJ MOJOKERTO ...). The output
+      // groups by branch when present so per-branch template names map to the
+      // right rows instead of the whole file.
+      function distGroupKey(row) {
+        const cb = (row.cabang || "").trim();
+        const d = (row.dist || "").trim();
+        if (cb) return d ? d + " \u2023 " + cb : cb; // dist ‣ cabang
+        return d || "(tanpa nama)";
+      }
+      // Stopwords that carry no identifying signal for distributor names.
+      const DIST_STOPWORDS = new Set([
+        "cv", "pt", "ud", "tbk", "persada", "group", "grup", "distribusi",
+        "distributor", "jaya", "abadi", "sukses", "utama", "perkasa", "mega",
+        "indonesia", "the", "and", "dan", "kota", "kabupaten", "kab",
+      ]);
+      function distTokens(s) {
+        return new Set(
+          String(s || "")
+            .toUpperCase()
+            .replace(/[,.\-_/()]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .split(" ")
+            .filter((w) => w.length > 2 && !DIST_STOPWORDS.has(w.toLowerCase())),
+        );
+      }
+      // Match a template distributor name to one of the data group keys.
+      // Returns the best key only when the match is meaningful, otherwise null
+      // (prevents an unrelated file being picked just because score > 0).
+      function matchDistKey(tplName, dataKeys) {
+        const norm = (s) =>
+          String(s || "")
+            .toUpperCase()
+            .replace(/[,.\-_/()]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        const nt = norm(tplName);
+        // exact normalized
+        let f = dataKeys.find((k) => norm(k) === nt);
+        if (f) return f;
+        // one fully contains the other (and the contained side is non-trivial)
+        f = dataKeys.find((k) => {
+          const nk = norm(k);
+          return (
+            (nk.length >= 4 && nt.includes(nk)) ||
+            (nt.length >= 4 && nk.includes(nt))
+          );
+        });
+        if (f) return f;
+        // token-overlap with threshold on DISTINCTIVE tokens only
+        const tt = distTokens(tplName);
+        if (tt.size === 0) return null;
+        let best = null,
+          bestRatio = 0,
+          bestOverlap = 0;
+        dataKeys.forEach((k) => {
+          const kt = distTokens(k);
+          if (kt.size === 0) return;
+          let overlap = 0;
+          tt.forEach((w) => {
+            if (kt.has(w)) overlap++;
+          });
+          if (overlap === 0) return;
+          // ratio over the smaller token set → rewards specific matches
+          const ratio = overlap / Math.min(tt.size, kt.size);
+          // Choose by ratio, breaking ties by the higher absolute overlap
+          // (so "...- GRESIK" with 2 shared tokens beats a 1-token coincidence).
+          if (ratio > bestRatio || (ratio === bestRatio && overlap > bestOverlap)) {
+            bestRatio = ratio;
+            bestOverlap = overlap;
+            best = k;
+          }
+        });
+        // require at least half of the distinctive tokens to align
+        return bestRatio >= 0.5 ? best : null;
+      }
+
       // Map a single template header cell to a data field slot.
       // Reuses the same vocabulary as DB column detection so the template can
       // use any wording ("NAMA CUSTOMER", "Pelanggan", "DPP", "Nilai", ...).
@@ -4666,19 +4706,69 @@
           "page1",
         ];
         const normName = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        // Quick test: does a sheet look like a PIVOT/summary rather than a raw
+        // transaction table? Pivots (e.g. SAJ Group "Sheet1") contain markers
+        // like "(All)", "(Multiple Items)", "Grand Total", "Sum of", "Row
+        // Labels". Picking a pivot loses most rows (only aggregated values
+        // survive) — exactly the "only a few values came in" bug.
+        const looksLikePivot = (ws) => {
+          if (!ws || !ws["!ref"]) return false;
+          let range;
+          try {
+            range = XLSX.utils.decode_range(ws["!ref"]);
+          } catch (_) {
+            return false;
+          }
+          const head = XLSX.utils.sheet_to_json(
+            Object.assign({}, ws, {
+              "!ref": XLSX.utils.encode_range({
+                s: range.s,
+                e: { c: Math.min(range.e.c, 15), r: Math.min(range.e.r, 12) },
+              }),
+            }),
+            { header: 1, defval: null, raw: true },
+          );
+          let hits = 0;
+          head.forEach((r) =>
+            (r || []).forEach((v) => {
+              const t = String(v == null ? "" : v).toLowerCase();
+              if (
+                t.includes("(all)") ||
+                t.includes("multiple items") ||
+                t.includes("grand total") ||
+                t.startsWith("sum of") ||
+                t.includes("row labels") ||
+                t.includes("column labels")
+              )
+                hits++;
+            }),
+          );
+          return hits >= 2; // a couple of these markers = pivot
+        };
+
+        // Name-priority match, but SKIP a matched sheet if it is a pivot.
         for (const p of NAME_PRIORITY) {
           const hit = wb.SheetNames.find((s) => {
             const n = normName(s);
-            return n === p || n.startsWith(p) || n.includes(p);
+            return (
+              (n === p || n.startsWith(p) || n.includes(p)) &&
+              !looksLikePivot(wb.Sheets[s])
+            );
           });
           if (hit) return hit;
         }
+
         const isCust = (h) =>
           /pelanggan|customer|nmcust|namatoko|listcustomer|custnm/.test(h);
         const isBrg = (h) =>
           /namabarang|namaproduk|namaproduct|nmbrg|namaitem|nmproduk|kodebarang|kodeproduk/.test(
             h,
           );
+        // Raw-transaction signal: a date/month column AND a qty column. Pivots
+        // usually lack a per-row qty/tanggal, so this favours the real data.
+        const isTxn = (h) =>
+          /tanggal|tgl|^date$|bulan|kuantitas|^qty/.test(h);
         let best = wb.SheetNames[0],
           bestScore = -1;
         wb.SheetNames.forEach((sn) => {
@@ -4691,6 +4781,7 @@
           } catch (_) {
             return;
           }
+          const pivot = looksLikePivot(ws);
           const rowCount = range.e.r;
           const head = XLSX.utils.sheet_to_json(
             Object.assign({}, ws, {
@@ -4702,16 +4793,20 @@
             { header: 1, defval: null, raw: true },
           );
           let hasCust = false,
-            hasBrg = false;
+            hasBrg = false,
+            hasTxn = false;
           head.forEach((r) =>
             (r || []).forEach((v) => {
               const h = normHdr(v);
               if (isCust(h)) hasCust = true;
               if (isBrg(h)) hasBrg = true;
+              if (isTxn(h)) hasTxn = true;
             }),
           );
-          const quality = (hasCust ? 1 : 0) + (hasBrg ? 1 : 0);
-          const score = quality * 1e7 + rowCount;
+          const quality =
+            (hasCust ? 1 : 0) + (hasBrg ? 1 : 0) + (hasTxn ? 1 : 0);
+          // Pivots are heavily penalised so a raw sheet always wins.
+          const score = quality * 1e7 + rowCount - (pivot ? 5e7 : 0);
           if (score > bestScore) {
             bestScore = score;
             best = sn;
@@ -5241,23 +5336,47 @@
           idx >= 0 && idx < row.length ? row[idx] : null;
         const str = (v) => (v == null ? "" : String(v).trim());
 
+        // Detect a branch/cabang column from the header (e.g. SAJ Group holds
+        // several "SAJ GRESIK / SAJ MOJOKERTO ..." branches in one file). When
+        // present, each row keeps its branch identity so per-branch template
+        // distributors map to the correct rows instead of the whole file.
+        let cabangIdx = -1;
+        const hc = mapping.hdrCells || [];
+        for (let i = 0; i < hc.length; i++) {
+          const h = String(hc[i] || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+          if (h === "cabang" || h.includes("cabang") || h === "branch") {
+            cabangIdx = i;
+            break;
+          }
+        }
+
         const rows = data
           .slice(startRow)
           .filter((r) => r.some((v) => v != null))
-          .map((r) => ({
-            dist: shortName,
-            cust: str(col(r, colMap.cust)),
-            bulan: normalizeBulan(
-              col(r, colMap.bulan) instanceof Date
-                ? MONTH_NAMES[col(r, colMap.bulan).getMonth()]
-                : col(r, colMap.bulan),
-            ),
-            barang: str(col(r, colMap.barang)),
-            qty: col(r, colMap.qty),
-            satuan: str(col(r, colMap.satuan)),
-            jumlah: col(r, colMap.jumlah),
-            salesman: colMap.salesman >= 0 ? str(col(r, colMap.salesman)) : "",
-          }))
+          .map((r) => {
+            const o = {
+              dist: shortName,
+              cust: str(col(r, colMap.cust)),
+              bulan: normalizeBulan(
+                col(r, colMap.bulan) instanceof Date
+                  ? MONTH_NAMES[col(r, colMap.bulan).getMonth()]
+                  : col(r, colMap.bulan),
+              ),
+              barang: str(col(r, colMap.barang)),
+              qty: col(r, colMap.qty),
+              satuan: str(col(r, colMap.satuan)),
+              jumlah: col(r, colMap.jumlah),
+              salesman:
+                colMap.salesman >= 0 ? str(col(r, colMap.salesman)) : "",
+            };
+            if (cabangIdx >= 0) {
+              const cb = str(col(r, cabangIdx));
+              if (cb) o.cabang = cb;
+            }
+            return o;
+          })
           .filter((r) => r.cust && r.barang);
 
         if (rows.length === 0)
