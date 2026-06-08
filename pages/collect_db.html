@@ -11,6 +11,13 @@
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
     />
     <link rel="stylesheet" href="/assets/css/style_collect_db.css" />
+    <style>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
     Í
@@ -2887,7 +2894,7 @@
       //  Format: NAMA DISTRIBUTOR | NO | NAMA CUSTOMER | BULAN (multi-col per bulan)
       //  Nilai: QTY total per customer per bulan dalam periode triwulan
       // ════════════════════════════════════════════════════════════
-      function buildROWorkbook() {
+      async function buildROWorkbook(onProgress) {
         const wb = XLSX.utils.book_new();
 
         // Determine months to use
@@ -3054,8 +3061,11 @@
         // For each dist, only output columns where at least 1 customer has data
         // But keep ALL period months as columns for consistency
 
-        // ── Buat 1 sheet per distributor ──
-        distOrder.forEach(({ displayName, dataKey }) => {
+        // ── Buat 1 sheet per distributor (async, yield per dist) ──
+        for (let _di = 0; _di < distOrder.length; _di++) {
+          const { displayName, dataKey } = distOrder[_di];
+          if (onProgress) onProgress(_di + 1, distOrder.length, displayName);
+          await new Promise((r) => setTimeout(r, 0)); // yield ke browser
           const custData = dataKey ? dataIdx[dataKey] || {} : {};
           const metaData = dataKey ? rowKeyMeta[dataKey] || {} : {};
           const rowKeys = Object.keys(custData).sort((a, b) => {
@@ -3287,13 +3297,8 @@
           const sheetName = displayName
             .replace(/[\\\/\?\*\[\]]/g, "")
             .slice(0, 31);
-          XLSX.utils.book_append_sheet(
-            wb,
-            ws,
-            sheetName ||
-              `Dist${distOrder.indexOf({ displayName, dataKey }) + 1}`,
-          );
-        });
+          XLSX.utils.book_append_sheet(wb, ws, sheetName || `Dist${_di + 1}`);
+        } // end for distOrder
 
         // ── Sheet ringkasan semua distributor ──
         const summaryData = [
@@ -3357,7 +3362,7 @@
       // ════════════════════════════════════════════════════════════
       //  EXPORT — FLAT MODE
       // ════════════════════════════════════════════════════════════
-      function buildFlatWorkbook() {
+      async function buildFlatWorkbook(onProgress) {
         const activeCols = cols.filter((c) => c.enabled);
         const headers = activeCols.map((c) => c.label);
 
@@ -3384,6 +3389,9 @@
         } else {
           periodData = resultData;
         }
+
+        if (onProgress) onProgress(0, 1, "Menyusun data...");
+        await new Promise((r) => setTimeout(r, 0));
 
         const wsData = [
           headers,
@@ -3421,7 +3429,7 @@
       // each row (NOT pivoted, NOT counted). Any data field not present in the
       // template is appended as an extra column. The selected period only
       // filters which rows are included.
-      function buildFlatPerDistWorkbook() {
+      async function buildFlatPerDistWorkbook(onProgress) {
         const wb = XLSX.utils.book_new();
         const ALL_FIELDS = [
           "dist",
@@ -3540,7 +3548,10 @@
           if (field === "dist") return displayName;
           return cellFor(row, field);
         };
-        distOrder.forEach(({ displayName, dataKey }) => {
+        for (let _di = 0; _di < distOrder.length; _di++) {
+          const { displayName, dataKey } = distOrder[_di];
+          if (onProgress) onProgress(_di + 1, distOrder.length, displayName);
+          await new Promise((r) => setTimeout(r, 0));
           const rows = dataKey ? byDist[dataKey] || [] : [];
           const aoa = [colPlan.map((c) => c.header)];
           if (rows.length) {
@@ -3576,7 +3587,7 @@
           }
           usedSheetNames.add(name);
           XLSX.utils.book_append_sheet(wb, ws, name);
-        });
+        } // end for distOrder
 
         if (wb.SheetNames.length === 0) {
           const ws = XLSX.utils.aoa_to_sheet([
@@ -3591,28 +3602,58 @@
       // ════════════════════════════════════════════════════════════
       //  EXPORT BUTTON
       // ════════════════════════════════════════════════════════════
-      $("btn-export").addEventListener("click", () => {
-        let wb;
-        if (exportMode === "flat") wb = buildFlatWorkbook();
-        else if (exportMode === "flatdist") wb = buildFlatPerDistWorkbook();
-        else wb = buildROWorkbook();
+      $("btn-export").addEventListener("click", async () => {
+        const btn = $("btn-export");
+        const originalHTML = btn.innerHTML;
 
-        const now = new Date();
-        const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-        const monthLabel =
-          activePeriodMonths.length > 0
-            ? "_" +
-              activePeriodMonths
-                .map((m) => m.slice(0, 3).toUpperCase())
-                .join("-")
-            : "";
-        const suffix =
-          exportMode === "flat"
-            ? "_FLAT"
-            : exportMode === "flatdist"
-              ? "_FLAT-PER-DIST"
-              : "_RO";
-        XLSX.writeFile(wb, `COLLECT_DB${suffix}${monthLabel}_${ts}.xlsx`);
+        // ── Loading state ──
+        const setExportLoading = (text) => {
+          btn.disabled = true;
+          btn.innerHTML = `<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> ${text}`;
+        };
+        const restoreBtn = () => {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        };
+
+        const onProgress = (done, total, name) => {
+          const pct = total > 1 ? ` (${done}/${total})` : "";
+          setExportLoading(`Menyusun${pct}…`);
+        };
+
+        setExportLoading("Mempersiapkan…");
+        // Beri browser 1 frame untuk render loading state sebelum kerja berat
+        await new Promise((r) => setTimeout(r, 16));
+
+        try {
+          let wb;
+          if (exportMode === "flat") wb = await buildFlatWorkbook(onProgress);
+          else if (exportMode === "flatdist")
+            wb = await buildFlatPerDistWorkbook(onProgress);
+          else wb = await buildROWorkbook(onProgress);
+
+          setExportLoading("Menulis file…");
+          await new Promise((r) => setTimeout(r, 0));
+
+          const now = new Date();
+          const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+          const monthLabel =
+            activePeriodMonths.length > 0
+              ? "_" +
+                activePeriodMonths
+                  .map((m) => m.slice(0, 3).toUpperCase())
+                  .join("-")
+              : "";
+          const suffix =
+            exportMode === "flat"
+              ? "_FLAT"
+              : exportMode === "flatdist"
+                ? "_FLAT-PER-DIST"
+                : "_RO";
+          XLSX.writeFile(wb, `COLLECT_DB${suffix}${monthLabel}_${ts}.xlsx`);
+        } finally {
+          restoreBtn();
+        }
       });
 
       // ════════════════════════════════════════════════════════════
@@ -4511,6 +4552,165 @@
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "");
 
+      // ── Sinonim umum untuk kolom ekstra dari template ──
+      // Key = token kunci, value = array alias normHdr yang ekuivalen
+      const EXTRA_SLOT_SYNONYMS = {
+        nota: [
+          "nota",
+          "nonota",
+          "nofaktur",
+          "nomornota",
+          "nomorfaktur",
+          "noinvoice",
+          "invoice",
+          "faktur",
+          "fakturno",
+          "invoiceno",
+          "notano",
+        ],
+        faktur: [
+          "faktur",
+          "nofaktur",
+          "nomorfaktur",
+          "fakturno",
+          "nofak",
+          "codefaktur",
+          "notafaktur",
+        ],
+        invoice: [
+          "invoice",
+          "invoiceno",
+          "noinvoice",
+          "inv",
+          "invno",
+          "invoicenumber",
+        ],
+        kode: [
+          "kode",
+          "kodebrg",
+          "kodebarang",
+          "kodeprod",
+          "kodeproduk",
+          "codeitem",
+          "itemcode",
+          "sku",
+          "productcode",
+        ],
+        kodeoutlet: [
+          "kodeoutlet",
+          "kodestore",
+          "custcode",
+          "kodecust",
+          "customercode",
+          "customerid",
+          "custid",
+          "kodepelanggan",
+          "outletcode",
+        ],
+        area: [
+          "area",
+          "wilayah",
+          "region",
+          "zona",
+          "zone",
+          "kodewilayah",
+          "namaarea",
+          "namaregion",
+        ],
+        rayon: ["rayon", "subarea", "rute", "route", "territory", "namarayon"],
+        kategori: [
+          "kategori",
+          "category",
+          "kat",
+          "segment",
+          "segmen",
+          "kelompok",
+          "group",
+          "grp",
+          "kategoriproduk",
+        ],
+        brand: [
+          "brand",
+          "merek",
+          "merk",
+          "brandname",
+          "namabrand",
+          "namamerek",
+        ],
+        divisi: [
+          "divisi",
+          "division",
+          "dept",
+          "departemen",
+          "department",
+          "namadivisi",
+        ],
+        gudang: [
+          "gudang",
+          "warehouse",
+          "wh",
+          "lokasi",
+          "location",
+          "namagudang",
+        ],
+        principal: [
+          "principal",
+          "prinsipal",
+          "princ",
+          "supplier",
+          "namaprincipal",
+        ],
+        tanggal: [
+          "tanggal",
+          "tgl",
+          "date",
+          "tglfaktur",
+          "tanggalfaktur",
+          "tglorder",
+          "tanggalorder",
+        ],
+      };
+
+      /**
+       * Buat matchRule untuk satu extra slot berdasarkan header template.
+       * exact  = normHdr(header) + sinonim sepanjang mirip header
+       * partial = token multiword (mis. "No Faktur" → ["nofak","faktur","nota",…])
+       */
+      function buildExtraSlotRule(header) {
+        const norm = normHdr(header);
+        const exactSet = new Set([norm]);
+        const partialSet = new Set();
+
+        // Split multiword header → token ≥3 char sebagai partial aliases
+        const tokens = norm.match(/[a-z0-9]{3,}/g) || [];
+        tokens.forEach((t) => partialSet.add(t));
+
+        // Sinonim berdasarkan token
+        tokens.forEach((t) => {
+          const syns = EXTRA_SLOT_SYNONYMS[t] || [];
+          syns.forEach((s) => {
+            if (s.length >= norm.length - 2) exactSet.add(s);
+            else partialSet.add(s);
+          });
+        });
+
+        // Sinonim berdasarkan norm itu sendiri ada di daftar sinonim key mana pun
+        Object.entries(EXTRA_SLOT_SYNONYMS).forEach(([, syns]) => {
+          if (syns.includes(norm)) {
+            syns.forEach((s) => {
+              if (s.length >= norm.length - 2) exactSet.add(s);
+              else partialSet.add(s);
+            });
+          }
+        });
+
+        return {
+          exact: Array.from(exactSet),
+          partial: Array.from(partialSet),
+          avoid: [],
+        };
+      }
+
       // ── Distributor grouping & matching (shared by RO + flat-per-dist) ──
       // Rows may carry a `cabang` (branch) when one file contains several
       // branches (e.g. SAJ Group → SAJ GRESIK, SAJ MOJOKERTO ...). The output
@@ -5006,6 +5206,20 @@
             map.bulan = dateIdx;
             used.add(dateIdx);
           }
+        }
+
+        // ── Extra slots dari template (tplExtraSlots) — fuzzy match otomatis ──
+        // Setiap slot ekstra (kolom template yang tidak dikenali) di-match ke
+        // kolom DB menggunakan buildExtraSlotRule + matchRule yang sama.
+        // Kolom yang sudah dipakai core slots di-skip via `used`.
+        if (typeof tplExtraSlots !== "undefined" && tplExtraSlots.length > 0) {
+          tplExtraSlots.forEach(({ id, label }) => {
+            if (map[id] !== undefined) return; // sudah di-set sebelumnya
+            const rule = buildExtraSlotRule(label);
+            const idx = matchRule(rule);
+            map[id] = idx;
+            if (idx >= 0) used.add(idx);
+          });
         }
 
         // Get sample values from first data row after header
