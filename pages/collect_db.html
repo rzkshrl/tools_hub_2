@@ -54,6 +54,42 @@
         </div>
       </div>
 
+      <!-- ══ Summary bar — muncul ab Step 2 ══ -->
+      <div
+        id="summary-bar"
+        class="hidden"
+        style="
+          background: var(--surface2, var(--bg2));
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 8px 14px;
+          margin-bottom: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px 16px;
+          font-size: 11px;
+          color: var(--text2);
+          align-items: center;
+        "
+      >
+        <span id="sb-zip" class="hidden"
+          ><i class="ti ti-file-zip" style="font-size: 12px"></i> <span></span
+        ></span>
+        <span id="sb-tpl" class="hidden"
+          ><i class="ti ti-layout" style="font-size: 12px"></i> <span></span
+        ></span>
+        <span id="sb-dbs" class="hidden"
+          ><i class="ti ti-building-store" style="font-size: 12px"></i>
+          <span></span
+        ></span>
+        <span id="sb-fmt" class="hidden"
+          ><i class="ti ti-download" style="font-size: 12px"></i> <span></span
+        ></span>
+        <span id="sb-period" class="hidden"
+          ><i class="ti ti-calendar" style="font-size: 12px"></i> <span></span
+        ></span>
+      </div>
+
       <!-- ══════════════ SECTION 1: Upload & DB Selection ══════════════ -->
       <div id="sec-upload" class="section">
         <div class="card">
@@ -543,6 +579,72 @@
               </div>
             </div>
           </div>
+          <!-- Export format selector — dipilih di sini, berlaku saat download -->
+          <div style="margin-bottom: 1.5rem; margin-top: 0.25rem">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              "
+            >
+              <i
+                class="ti ti-download"
+                style="color: var(--blue); font-size: 14px"
+              ></i>
+              Format Export
+            </div>
+            <div
+              style="font-size: 12px; color: var(--text2); margin-bottom: 10px"
+            >
+              Pilih bentuk file output yang akan dihasilkan saat download.
+            </div>
+            <div class="export-mode-group" id="export-format-section">
+              <button
+                class="export-mode-btn selected"
+                id="emb-template"
+                onclick="selectExportMode('template')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-table" style="font-size: 14px"></i> Format RO
+                  (per Distributor)
+                </div>
+                <div class="emb-desc">
+                  1 sheet per distributor, kolom bulan triwulan
+                </div>
+              </button>
+              <button
+                class="export-mode-btn"
+                id="emb-flat"
+                onclick="selectExportMode('flat')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-list" style="font-size: 14px"></i> Format
+                  Default (Flat)
+                </div>
+                <div class="emb-desc">
+                  Kolom standar: Distributor, Customer, Bulan, Barang, QTY...
+                </div>
+              </button>
+              <button
+                class="export-mode-btn"
+                id="emb-flatdist"
+                onclick="selectExportMode('flatdist')"
+              >
+                <div class="emb-title">
+                  <i class="ti ti-layout-list" style="font-size: 14px"></i>
+                  Gabungan per Distributor
+                </div>
+                <div class="emb-desc">
+                  1 sheet per distributor, data mentah, kolom ikut template
+                </div>
+              </button>
+            </div>
+          </div>
 
           <div class="btn-row">
             <button class="btn" id="btn-back-format">
@@ -789,7 +891,7 @@
           </div>
 
           <!-- Export format selector (only shown when template active) -->
-          <div
+          <!-- <div
             id="export-format-section"
             class="hidden"
             style="margin-top: 1rem"
@@ -846,7 +948,7 @@
                 </div>
               </button>
             </div>
-          </div>
+          </div> -->
 
           <div class="btn-row">
             <button class="btn btn-primary" id="btn-export">
@@ -1127,12 +1229,56 @@
         });
       }
 
+      function updateSummaryBar() {
+        const bar = $("summary-bar");
+        if (!bar) return;
+        // Zip
+        const sbZip = $("sb-zip");
+        if (zipFile) {
+          sbZip.querySelector("span").textContent = zipFile.name;
+          sbZip.classList.remove("hidden");
+        } else sbZip.classList.add("hidden");
+        // Template
+        const sbTpl = $("sb-tpl");
+        if (tplActive && tplFile) {
+          sbTpl.querySelector("span").textContent = "Template: " + tplFile.name;
+          sbTpl.classList.remove("hidden");
+        } else sbTpl.classList.add("hidden");
+        // DB selected
+        const sbDbs = $("sb-dbs");
+        if (selectedDBs.size > 0) {
+          sbDbs.querySelector("span").textContent =
+            selectedDBs.size + " DB dipilih";
+          sbDbs.classList.remove("hidden");
+        } else sbDbs.classList.add("hidden");
+        // Format export
+        const sbFmt = $("sb-fmt");
+        const fmtLabel =
+          exportMode === "flat"
+            ? "Flat"
+            : exportMode === "flatdist"
+              ? "Flat per Dist"
+              : "RO per Dist";
+        sbFmt.querySelector("span").textContent = "Output: " + fmtLabel;
+        sbFmt.classList.remove("hidden");
+        // Period
+        const sbPeriod = $("sb-period");
+        if (activePeriodMonths && activePeriodMonths.length > 0) {
+          sbPeriod.querySelector("span").textContent =
+            activePeriodMonths.join(", ");
+          sbPeriod.classList.remove("hidden");
+        } else sbPeriod.classList.add("hidden");
+        // Show bar itself from step 2 onwards
+        bar.classList.remove("hidden");
+      }
+
       function selectExportMode(mode) {
         exportMode = mode;
         $("emb-template").classList.toggle("selected", mode === "template");
         $("emb-flat").classList.toggle("selected", mode === "flat");
         const ef = $("emb-flatdist");
         if (ef) ef.classList.toggle("selected", mode === "flatdist");
+        updateSummaryBar();
       }
 
       // RO output: switch between counting outlets (RO) and summing a metric.
@@ -1683,6 +1829,7 @@
       $("btn-next-1").addEventListener("click", async () => {
         setStep(2);
         showSection("format");
+        updateSummaryBar();
 
         // Parse template workbook for row-field detection (non-blocking)
         tplWb = null;
@@ -1753,6 +1900,13 @@
         showSection("columns");
         document.querySelector(".app").classList.remove("wide");
         updateModePills();
+        // Inject extra slots dari template ke cols (flat export) jika belum ada
+        tplExtraSlots.forEach(({ id, label }) => {
+          if (!cols.find((c) => c.id === id)) {
+            cols.push({ id, label, enabled: true });
+          }
+        });
+        updateSummaryBar();
         renderCols();
         renderMonthChips();
       });
@@ -1778,6 +1932,7 @@
         activePeriodMonths = months; // may be [] for total → resolved post-process
         setStep(5);
         showSection("process");
+        updateSummaryBar();
         startProcessing();
       });
 
@@ -2226,6 +2381,12 @@
 
       $("btn-reset-cols").addEventListener("click", () => {
         cols = JSON.parse(JSON.stringify(COLS_DEFAULT));
+        // Re-inject extra slots dari template setelah reset
+        tplExtraSlots.forEach(({ id, label }) => {
+          if (!cols.find((c) => c.id === id)) {
+            cols.push({ id, label, enabled: true });
+          }
+        });
         renderCols();
       });
 
@@ -2921,11 +3082,11 @@
             .join("");
         }
 
-        // Show format selector — always show since we now always have RO mode
-        $("export-format-section").classList.remove("hidden");
-        // Total mode defaults to FLAT (single merged sheet, matches the
-        // combined Excel); auto/manual default to per-distributor RO.
-        selectExportMode(periodMode === "total" ? "flat" : "template");
+        // Format sudah dipilih di Step 2 — tidak perlu show/hide lagi di sini
+        // Hanya sinkronkan default jika user belum pernah ke Step 2 (fallback)
+        if (!exportMode) {
+          selectExportMode(periodMode === "total" ? "flat" : "template");
+        }
       }
 
       $("btn-cancel").addEventListener("click", () => {
@@ -3080,8 +3241,11 @@
           distOrder = [];
           tplDistOrder.forEach((tplName) => {
             const key = fuzzyMatch(tplName, dataDistKeys);
-            distOrder.push({ displayName: tplName, dataKey: key });
-            if (key) processedKeys.add(key);
+            if (key && !processedKeys.has(key)) {
+              distOrder.push({ displayName: key, dataKey: key });
+              processedKeys.add(key);
+            }
+            // Jika tidak match, skip — jangan emit sheet kosong dari nama tpl
           });
           // Add distributor from data that are not in template
           dataDistKeys
@@ -3563,8 +3727,10 @@
         if (tplActive && tplDistOrder.length) {
           tplDistOrder.forEach((tplName) => {
             const key = matchDistKey(tplName, dataDistKeys);
-            distOrder.push({ displayName: tplName, dataKey: key });
-            if (key) used.add(key);
+            if (key && !used.has(key)) {
+              distOrder.push({ displayName: key, dataKey: key });
+              used.add(key);
+            }
           });
         } else {
           Array.from(selectedDBs).forEach((shortName) => {
@@ -3701,7 +3867,7 @@
         $("tpl-selected").classList.add("hidden");
         tplZone.classList.remove("hidden");
         $("tpl-file-input").value = "";
-        $("export-format-section").classList.add("hidden");
+        // $("export-format-section").classList.add("hidden");
         $("quarter-preview-wrap").classList.add("hidden");
         $("sel-target-month").value = "";
         setPeriodMode("auto");
