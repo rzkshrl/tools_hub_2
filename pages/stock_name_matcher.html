@@ -6,6 +6,16 @@
     <title>Stock Name Matcher</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="/assets/css/style_stock_name_matcher.css" />
+    <style>
+      .zip-tag{display:inline-block;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;letter-spacing:.4px;margin-left:6px;vertical-align:middle;}
+      .db-file-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+      .db-file-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-size:12px;}
+      .db-file-item .dfi-name{font-weight:500;color:var(--text);}
+      .db-file-item .dfi-meta{color:var(--text3);font-size:11px;}
+      .db-file-item .rm{cursor:pointer;color:var(--text3);font-size:18px;line-height:1;margin-left:8px;}
+      .db-file-item .rm:hover{color:var(--red);}
+      .match-direction-note{background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--blue);margin-bottom:16px;line-height:1.6;}
+    </style>
   </head>
   <body>
     <div class="loader-overlay" id="loader">
@@ -51,7 +61,7 @@
           </div>
         </div>
         <div>
-          <div class="sb-label">Distributor aktif</div>
+          <div class="sb-label">File Distributor</div>
           <div class="distrib-list" id="distribList">
             <div style="font-size: 12px; color: var(--text3)">
               Belum ada file diupload.
@@ -75,7 +85,7 @@
         <div class="page active" id="page1">
           <div class="card">
             <div class="card-head">
-              <div class="card-title">File stok bulanan kamu</div>
+              <div class="card-title">File stok bulanan kamu <span style="font-size:11px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(sebagai referensi nama SKU)</span></div>
             </div>
             <div
               class="upload-zone"
@@ -102,16 +112,7 @@
           <div class="card">
             <div class="card-head">
               <div class="card-title">File distributor</div>
-              <span style="font-size: 12px; color: var(--text2)"
-                >Bisa lebih dari 1</span
-              >
-            </div>
-            <div class="distrib-input-row">
-              <input
-                type="text"
-                id="distribName"
-                placeholder="Nama distributor (contoh: ANNT, Sumber Jaya, ...)"
-              />
+              <span style="font-size: 12px; color: var(--text2)">Bisa lebih dari 1 · bisa .zip</span>
             </div>
             <div
               class="upload-zone"
@@ -119,20 +120,21 @@
               onclick="triggerUpload('dbFile')"
               ondragover="onDrag(event, 'dbZone')"
               ondragleave="offDrag('dbZone')"
-              ondrop="onDrop(event, 'dbFile', 'dbZone')"
+              ondrop="onDropDb(event, 'dbZone')"
             >
               <div class="icon">📦</div>
               <p>Klik atau drag & drop file distributor</p>
-              <small>.xlsx · .xls · .csv</small>
+              <small>.xlsx · .xls · .csv — atau <strong>.zip</strong> berisi banyak file</small>
             </div>
             <input
               type="file"
               id="dbFile"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls,.csv,.zip"
               style="display: none"
-              onchange="loadDbFile(event)"
+              multiple
+              onchange="loadDbFiles(event)"
             />
-            <div id="dbFileInfo" style="display: none"></div>
+            <div id="dbFileList" class="db-file-list"></div>
           </div>
 
           <div class="btn-row">
@@ -149,6 +151,9 @@
 
         <!-- PAGE 2: PILIH KOLOM -->
         <div class="page" id="page2">
+          <div class="match-direction-note">
+            💡 <strong>Arah matching:</strong> Nama barang dari setiap file distributor akan dicocokkan ke nama SKU di file stok bulanan kamu.
+          </div>
           <div class="card">
             <div class="card-title" style="margin-bottom: 14px">
               Kolom dari file stok bulanan kamu
@@ -206,7 +211,7 @@
               <input
                 type="text"
                 id="filterQ"
-                placeholder="Cari nama SKU..."
+                placeholder="Cari nama barang distributor..."
                 oninput="filterTable()"
               />
               <select id="filterConf" onchange="filterTable()">
@@ -225,11 +230,11 @@
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>SKU Kamu</th>
                     <th>Nama Barang Distributor</th>
+                    <th>Distributor</th>
+                    <th>→ SKU Kamu (Referensi)</th>
                     <th>Stock Akhir</th>
                     <th>Skor</th>
-                    <th>Distributor</th>
                   </tr>
                 </thead>
                 <tbody id="matchTbody"></tbody>
@@ -254,7 +259,7 @@
             <p style="font-size: 13px; color: var(--text2); margin: 14px 0">
               File Excel akan didownload langsung. Kolom
               <strong>STOK END CLOSING</strong> sudah terisi dari data
-              distributor.
+              distributor, diisi ke baris SKU yang cocok di file stok bulanan.
             </p>
             <button class="btn btn-green" onclick="exportExcel()">
               ⬇ Download Excel sekarang
@@ -291,15 +296,15 @@
       // STATE
       // ============================================================
       var S = {
-        myFile: null, // {name, parsed:{headers,rows}}
+        myFile: null,       // {name, parsed:{headers,rows}}
         myColSku: 0,
         myColStokEnd: 0,
-        distributors: [], // [{name, parsed:{headers,rows}, colName, colStock}]
-        matchResults: [], // [{sku,rowIndex,db_name,stock,distributor,confidence}]
+        distributors: [],   // [{name, fname, parsed:{headers,rows}, colName, colStock}]
+        matchResults: [],   // [{db_name, distributor, sku_matched, stock, rowIndex(in my), confidence}]
       };
 
       // ============================================================
-      // PARSE FILE — 100% di browser pakai SheetJS (tidak ke server)
+      // PARSE FILE — 100% di browser pakai SheetJS
       // ============================================================
       function parseFileInBrowser(file, cb) {
         var reader = new FileReader();
@@ -310,83 +315,146 @@
             var ws = wb.Sheets[wb.SheetNames[0]];
             var raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-            // Cari baris header
             var hIdx = 0;
             for (var i = 0; i < Math.min(raw.length, 10); i++) {
               var filled = raw[i].filter(function (c) {
                 return String(c).trim() !== "";
               }).length;
-              if (filled >= 2) {
-                hIdx = i;
-                break;
-              }
+              if (filled >= 2) { hIdx = i; break; }
             }
-            var headers = raw[hIdx].map(function (h) {
-              return String(h).trim();
-            });
+            var headers = raw[hIdx].map(function (h) { return String(h).trim(); });
             var rows = [];
             for (var r = hIdx + 1; r < raw.length; r++) {
-              var row = raw[r].map(function (c) {
-                return String(c).trim();
-              });
-              if (
-                row.some(function (c) {
-                  return c !== "";
-                })
-              )
-                rows.push(row);
+              var row = raw[r].map(function (c) { return String(c).trim(); });
+              if (row.some(function (c) { return c !== ""; })) rows.push(row);
             }
-            cb(null, {
-              headers: headers,
-              rows: rows,
-              sheetNames: wb.SheetNames,
-            });
+            cb(null, { headers: headers, rows: rows, sheetNames: wb.SheetNames });
           } catch (err) {
             cb(err.message);
           }
         };
-        reader.onerror = function () {
-          cb("Gagal membaca file.");
+        reader.onerror = function () { cb("Gagal membaca file."); };
+        reader.readAsArrayBuffer(file);
+      }
+
+      // Baca array buffer zip dan kembalikan daftar file xlsx/xls/csv di dalamnya
+      function extractFilesFromZip(file, cb) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            var data = new Uint8Array(e.target.result);
+            var zip = XLSX.read(data, { type: "array" });
+            // XLSX.read tidak bisa baca zip biasa — gunakan pendekatan JSZip-less manual via XLSX util
+            // Kita pakai cara lain: baca zip entries via method yang tersedia di SheetJS
+            cb("ZIP_UNSUPPORTED", null);
+          } catch(err) {
+            cb(err.message, null);
+          }
         };
         reader.readAsArrayBuffer(file);
+      }
+
+      // Proses zip dengan cara native — ekstrak file satu per satu menggunakan JSZip (CDN) atau fallback
+      function processZipFile(file, onFileParsed, onDone) {
+        // Kita load JSZip on-demand
+        if (typeof JSZip === "undefined") {
+          var sc = document.createElement("script");
+          sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+          sc.onload = function() { _doUnzip(file, onFileParsed, onDone); };
+          sc.onerror = function() { onDone("Gagal load JSZip."); };
+          document.head.appendChild(sc);
+        } else {
+          _doUnzip(file, onFileParsed, onDone);
+        }
+      }
+
+      function _doUnzip(file, onFileParsed, onDone) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          JSZip.loadAsync(e.target.result).then(function(zip) {
+            var VALID_EXT = /\.(xlsx|xls|csv)$/i;
+            var entries = [];
+            zip.forEach(function(relPath, entry) {
+              // skip hidden/system files
+              if (!entry.dir && VALID_EXT.test(relPath) && !relPath.startsWith("__MACOSX")) {
+                entries.push({ path: relPath, entry: entry });
+              }
+            });
+            if (!entries.length) { onDone("Tidak ada file .xlsx/.xls/.csv di dalam ZIP."); return; }
+            var idx = 0;
+            function next() {
+              if (idx >= entries.length) { onDone(null); return; }
+              var e = entries[idx++];
+              var fname = e.path.split("/").pop();
+              e.entry.async("arraybuffer").then(function(buf) {
+                try {
+                  var data = new Uint8Array(buf);
+                  var wb = XLSX.read(data, { type: "array" });
+                  var ws = wb.Sheets[wb.SheetNames[0]];
+                  var raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+                  var hIdx = 0;
+                  for (var i = 0; i < Math.min(raw.length, 10); i++) {
+                    var filled = raw[i].filter(function(c){ return String(c).trim() !== ""; }).length;
+                    if (filled >= 2) { hIdx = i; break; }
+                  }
+                  var headers = raw[hIdx].map(function(h){ return String(h).trim(); });
+                  var rows = [];
+                  for (var r = hIdx + 1; r < raw.length; r++) {
+                    var row = raw[r].map(function(c){ return String(c).trim(); });
+                    if (row.some(function(c){ return c !== ""; })) rows.push(row);
+                  }
+                  onFileParsed(fname, { headers: headers, rows: rows });
+                } catch(err) {
+                  // skip file yang error
+                }
+                next();
+              }).catch(function(){ next(); });
+            }
+            next();
+          }).catch(function(err){ onDone("Gagal membaca ZIP: " + err.message); });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      // Derive nama distributor dari nama file (hapus ekstensi)
+      function distribNameFromFilename(fname) {
+        return fname.replace(/\.(xlsx|xls|csv)$/i, "").replace(/_/g, " ").trim();
       }
 
       // ============================================================
       // UPLOAD HANDLERS
       // ============================================================
-      function triggerUpload(id) {
-        document.getElementById(id).click();
-      }
+      function triggerUpload(id) { document.getElementById(id).click(); }
       function onDrag(e, z) {
         e.preventDefault();
         document.getElementById(z).classList.add("drag");
       }
-      function offDrag(z) {
-        document.getElementById(z).classList.remove("drag");
-      }
+      function offDrag(z) { document.getElementById(z).classList.remove("drag"); }
       function onDrop(e, inp, z) {
-        e.preventDefault();
-        offDrag(z);
+        e.preventDefault(); offDrag(z);
         var f = e.dataTransfer.files[0];
         if (!f) return;
-        var dt = new DataTransfer();
-        dt.items.add(f);
+        var dt = new DataTransfer(); dt.items.add(f);
         document.getElementById(inp).files = dt.files;
         document.getElementById(inp).dispatchEvent(new Event("change"));
+      }
+      function onDropDb(e, z) {
+        e.preventDefault(); offDrag(z);
+        var files = e.dataTransfer.files;
+        if (!files.length) return;
+        handleDbFilesArray(Array.from(files));
       }
 
       function loadMyFile(e) {
         var file = e.target.files[0];
         if (!file) return;
-        showLoader("Membaca file...");
+        showLoader("Membaca file stok bulanan...");
         parseFileInBrowser(file, function (err, parsed) {
           hideLoader();
           if (err) {
             document.getElementById("myFileInfo").style.display = "block";
             document.getElementById("myFileInfo").innerHTML =
-              '<div class="alert alert-red" style="margin-top:8px">✗ ' +
-              esc(err) +
-              "</div>";
+              '<div class="alert alert-red" style="margin-top:8px">✗ ' + esc(err) + "</div>";
             return;
           }
           S.myFile = { name: file.name, parsed: parsed };
@@ -410,14 +478,8 @@
           '<div class="file-info-bar">' +
           '<div class="fi-left">' +
           '<span class="fi-icon">📊</span>' +
-          '<div><div class="fi-name">' +
-          esc(S.myFile.name) +
-          "</div>" +
-          '<div class="fi-meta">' +
-          S.myFile.parsed.rows.length +
-          " baris &middot; " +
-          S.myFile.parsed.headers.length +
-          " kolom</div></div>" +
+          '<div><div class="fi-name">' + esc(S.myFile.name) + "</div>" +
+          '<div class="fi-meta">' + S.myFile.parsed.rows.length + " baris &middot; " + S.myFile.parsed.headers.length + " kolom</div></div>" +
           "</div>" +
           '<button class="fi-cancel" onclick="cancelMyFile()">✕ Hapus file</button>' +
           "</div>";
@@ -430,75 +492,100 @@
         checkReady();
       }
 
-      function loadDbFile(e) {
-        var file = e.target.files[0];
-        if (!file) return;
-        var dname = document.getElementById("distribName").value.trim();
-        if (!dname) {
-          alert("Isi nama distributor dulu.");
-          e.target.value = "";
-          return;
-        }
+      function loadDbFiles(e) {
+        var files = Array.from(e.target.files);
+        e.target.value = "";
+        handleDbFilesArray(files);
+      }
+
+      function handleDbFilesArray(files) {
+        if (!files.length) return;
+        var zipFiles = files.filter(function(f){ return f.name.toLowerCase().endsWith(".zip"); });
+        var directFiles = files.filter(function(f){ return !f.name.toLowerCase().endsWith(".zip"); });
+
+        var pending = directFiles.length + zipFiles.length;
+        if (!pending) return;
+
         showLoader("Membaca file distributor...");
-        parseFileInBrowser(file, function (err, parsed) {
-          hideLoader();
-          if (err) {
-            alert("Error membaca file: " + err);
-            e.target.value = "";
-            return;
+
+        function doneMaybe() {
+          pending--;
+          if (pending <= 0) {
+            hideLoader();
+            renderDbFileList();
+            checkReady();
           }
-          // Ganti jika nama distributor sama (re-upload)
-          S.distributors = S.distributors.filter(function (d) {
-            return d.name !== dname;
+        }
+
+        // Proses file langsung (xlsx/xls/csv)
+        directFiles.forEach(function(file) {
+          parseFileInBrowser(file, function(err, parsed) {
+            if (!err) {
+              var dname = distribNameFromFilename(file.name);
+              addDistributor(dname, file.name, parsed);
+            }
+            doneMaybe();
           });
-          S.distributors.push({
-            name: dname,
-            fname: file.name,
-            parsed: parsed,
-            colName: 0,
-            colStock: 0,
-          });
-          document.getElementById("distribName").value = "";
-          document.getElementById("dbFile").value = "";
-          renderDistribList();
-          checkReady();
+        });
+
+        // Proses file zip
+        zipFiles.forEach(function(file) {
+          processZipFile(file,
+            function(fname, parsed) {
+              var dname = distribNameFromFilename(fname);
+              addDistributor(dname, fname, parsed);
+            },
+            function(err) {
+              if (err) alert("Error ZIP (" + file.name + "): " + err);
+              doneMaybe();
+            }
+          );
         });
       }
 
-      function checkReady() {
-        document.getElementById("btnStep2").disabled = !(
-          S.myFile && S.distributors.length > 0
-        );
+      function addDistributor(dname, fname, parsed) {
+        // Jika nama sudah ada, ganti
+        S.distributors = S.distributors.filter(function(d){ return d.name !== dname; });
+        S.distributors.push({ name: dname, fname: fname, parsed: parsed, colName: 0, colStock: 0 });
       }
 
-      function renderDistribList() {
-        var el = document.getElementById("distribList");
+      function checkReady() {
+        document.getElementById("btnStep2").disabled = !(S.myFile && S.distributors.length > 0);
+      }
+
+      function renderDbFileList() {
+        var el = document.getElementById("dbFileList");
+        var sideEl = document.getElementById("distribList");
         if (!S.distributors.length) {
-          el.innerHTML =
-            '<div style="font-size:12px;color:var(--text3)">Belum ada.</div>';
+          el.innerHTML = "";
+          sideEl.innerHTML = '<div style="font-size:12px;color:var(--text3)">Belum ada.</div>';
           return;
         }
-        el.innerHTML = S.distributors
-          .map(function (d, i) {
-            return (
-              '<div class="distrib-chip">' +
-              '<span style="font-weight:500">' +
-              esc(d.name) +
-              "</span>" +
-              '<span style="color:var(--text3);font-size:11px">' +
-              d.parsed.rows.length +
-              " baris</span>" +
-              '<span class="rm" onclick="removeDistrib(' +
-              i +
-              ')" title="Hapus">×</span>' +
-              "</div>"
-            );
-          })
-          .join("");
+        el.innerHTML = S.distributors.map(function(d, i) {
+          return (
+            '<div class="db-file-item">' +
+            '<div>' +
+            '<div class="dfi-name">' + esc(d.name) + (d.fname !== d.name + ".xlsx" && d.fname !== d.name + ".xls" && d.fname !== d.name + ".csv" ? ' <span style="color:var(--text3);font-size:11px">(' + esc(d.fname) + ')</span>' : '') + '</div>' +
+            '<div class="dfi-meta">' + d.parsed.rows.length + ' baris &middot; ' + d.parsed.headers.length + ' kolom</div>' +
+            '</div>' +
+            '<span class="rm" onclick="removeDistrib(' + i + ')" title="Hapus">×</span>' +
+            '</div>'
+          );
+        }).join("");
+        sideEl.innerHTML = S.distributors.map(function(d, i) {
+          return (
+            '<div class="distrib-chip">' +
+            '<span style="font-weight:500">' + esc(d.name) + '</span>' +
+            '<span style="color:var(--text3);font-size:11px">' + d.parsed.rows.length + ' baris</span>' +
+            '<span class="rm" onclick="removeDistrib(' + i + ')" title="Hapus">×</span>' +
+            '</div>'
+          );
+        }).join("");
       }
+
       function removeDistrib(i) {
         S.distributors.splice(i, 1);
-        renderDistribList();
+        renderDbFileList();
         checkReady();
       }
 
@@ -512,24 +599,13 @@
 
       function buildColPickers() {
         var h = S.myFile.parsed.headers;
-        var skuIdx = autoDetect(h, [
-          "sku",
-          "nama",
-          "barang",
-          "produk",
-          "item",
-          "name",
-        ]);
+        var skuIdx = autoDetect(h, ["sku", "nama", "barang", "produk", "item", "name"]);
         var stokIdx = autoDetect(h, ["stok", "stock", "closing", "end"]);
         document.getElementById("myColPicker").innerHTML =
           "<div><label>Kolom nama produk / SKU</label>" +
-          '<select id="myColSku" onchange="previewMy()">' +
-          opts(h) +
-          "</select></div>" +
+          '<select id="myColSku" onchange="previewMy()">' + opts(h) + "</select></div>" +
           "<div><label>Kolom STOK END CLOSING (yang mau diisi)</label>" +
-          '<select id="myColStokEnd">' +
-          opts(h) +
-          "</select></div>";
+          '<select id="myColStokEnd">' + opts(h) + "</select></div>";
         document.getElementById("myColSku").selectedIndex = skuIdx;
         document.getElementById("myColStokEnd").selectedIndex = stokIdx;
         previewMy();
@@ -539,56 +615,27 @@
           var dh = d.parsed.headers;
           cards +=
             '<div class="card">' +
-            '<div class="card-title" style="margin-bottom:14px">Kolom dari: <strong>' +
-            d.name +
-            "</strong></div>" +
+            '<div class="card-title" style="margin-bottom:14px">Kolom dari: <strong>' + esc(d.name) + "</strong></div>" +
             '<div class="col-picker">' +
-            '<div><label>Kolom nama barang</label><select id="dbN' +
-            i +
-            '" onchange="previewDb(' +
-            i +
-            ')">' +
-            opts(dh) +
-            "</select></div>" +
-            '<div><label>Kolom stock akhir</label><select id="dbS' +
-            i +
-            '">' +
-            opts(dh) +
-            "</select></div>" +
+            '<div><label>Kolom nama barang</label><select id="dbN' + i + '" onchange="previewDb(' + i + ')">' + opts(dh) + "</select></div>" +
+            '<div><label>Kolom stock akhir</label><select id="dbS' + i + '">' + opts(dh) + "</select></div>" +
             "</div>" +
-            '<div id="dbPrev' +
-            i +
-            '" style="margin-top:12px"></div>' +
+            '<div id="dbPrev' + i + '" style="margin-top:12px"></div>' +
             "</div>";
         });
         document.getElementById("dbColCards").innerHTML = cards;
         S.distributors.forEach(function (d, i) {
           var dh = d.parsed.headers;
-          document.getElementById("dbN" + i).selectedIndex = autoDetect(dh, [
-            "nama",
-            "barang",
-            "produk",
-            "item",
-            "name",
-          ]);
-          document.getElementById("dbS" + i).selectedIndex = autoDetect(dh, [
-            "stok",
-            "stock",
-            "akhir",
-            "sisa",
-            "qty",
-            "jumlah",
-          ]);
+          document.getElementById("dbN" + i).selectedIndex = autoDetect(dh, ["nama", "barang", "produk", "item", "name"]);
+          document.getElementById("dbS" + i).selectedIndex = autoDetect(dh, ["stok", "stock", "akhir", "sisa", "qty", "jumlah"]);
           previewDb(i);
         });
       }
 
       function opts(headers) {
-        return headers
-          .map(function (h, i) {
-            return '<option value="' + i + '">' + h + "</option>";
-          })
-          .join("");
+        return headers.map(function (h, i) {
+          return '<option value="' + i + '">' + h + "</option>";
+        }).join("");
       }
       function autoDetect(headers, kws) {
         for (var k = 0; k < kws.length; k++)
@@ -598,48 +645,33 @@
       }
       function previewMy() {
         var idx = parseInt(document.getElementById("myColSku").value);
-        var chips = S.myFile.parsed.rows
-          .slice(0, 5)
-          .map(function (r) {
-            return '<span class="preview-chip">' + esc(r[idx]) + "</span>";
-          })
-          .join("");
+        var chips = S.myFile.parsed.rows.slice(0, 5).map(function (r) {
+          return '<span class="preview-chip">' + esc(r[idx]) + "</span>";
+        }).join("");
         document.getElementById("myPreview").innerHTML =
-          '<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Preview 5 baris:</div>' +
-          '<div class="preview-chips">' +
-          chips +
-          "</div>";
+          '<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Preview 5 baris SKU referensi:</div>' +
+          '<div class="preview-chips">' + chips + "</div>";
       }
       function previewDb(i) {
         var ni = parseInt(document.getElementById("dbN" + i).value);
         var si = parseInt(document.getElementById("dbS" + i).value);
-        var chips = S.distributors[i].parsed.rows
-          .slice(0, 4)
-          .map(function (r) {
-            return (
-              '<span class="preview-chip">' +
-              esc(r[ni]) +
-              " — <strong>" +
-              esc(r[si]) +
-              "</strong></span>"
-            );
-          })
-          .join("");
+        var chips = S.distributors[i].parsed.rows.slice(0, 4).map(function (r) {
+          return (
+            '<span class="preview-chip">' + esc(r[ni]) + " — <strong>" + esc(r[si]) + "</strong></span>"
+          );
+        }).join("");
         document.getElementById("dbPrev" + i).innerHTML =
           '<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Preview:</div>' +
-          '<div class="preview-chips">' +
-          chips +
-          "</div>";
+          '<div class="preview-chips">' + chips + "</div>";
       }
 
       // ============================================================
-      // STEP 3 — FUZZY MATCHING (100% di browser, tanpa server call)
+      // STEP 3 — FUZZY MATCHING
+      // Arah: setiap nama barang di file distributor → cari SKU terbaik di file stok bulanan
       // ============================================================
       function goToStep3() {
         S.myColSku = parseInt(document.getElementById("myColSku").value);
-        S.myColStokEnd = parseInt(
-          document.getElementById("myColStokEnd").value,
-        );
+        S.myColStokEnd = parseInt(document.getElementById("myColStokEnd").value);
         S.distributors.forEach(function (d, i) {
           d.colName = parseInt(document.getElementById("dbN" + i).value);
           d.colStock = parseInt(document.getElementById("dbS" + i).value);
@@ -652,63 +684,48 @@
         var log = document.getElementById("matchLog");
         log.innerHTML = "";
         function addLog(msg, cls) {
-          log.innerHTML +=
-            '<div class="log-line' +
-            (cls ? " " + cls : "") +
-            '">' +
-            msg +
-            "</div>";
+          log.innerHTML += '<div class="log-line' + (cls ? " " + cls : "") + '">' + msg + "</div>";
         }
 
+        // Bangun daftar SKU dari file stok bulanan sebagai referensi
         var mySkus = [];
         S.myFile.parsed.rows.forEach(function (row, ri) {
           var sku = (row[S.myColSku] || "").trim();
           if (sku && sku.toUpperCase() !== "TOTAL")
             mySkus.push({ sku: sku, rowIndex: ri });
         });
-        addLog("✓ " + mySkus.length + " SKU dari file kamu.");
+        addLog("✓ " + mySkus.length + " SKU referensi dari file stok bulanan.");
 
+        // Kumpulkan semua nama barang dari file-file distributor
         var dbItems = [];
         S.distributors.forEach(function (d) {
           d.parsed.rows.forEach(function (row) {
             var name = (row[d.colName] || "").trim();
             var stock = (row[d.colStock] || "").trim();
-            if (name)
-              dbItems.push({ name: name, stock: stock, distributor: d.name });
+            if (name) dbItems.push({ name: name, stock: stock, distributor: d.name });
           });
         });
-        addLog(
-          "✓ " +
-            dbItems.length +
-            " item dari " +
-            S.distributors.length +
-            " distributor.",
-        );
-        addLog("⏳ Menghitung skor kesamaan...");
+        addLog("✓ " + dbItems.length + " item dari " + S.distributors.length + " distributor.");
+        addLog("⏳ Mencocokkan nama barang distributor ke SKU referensi...");
 
         // Jalankan matching async agar browser tidak freeze
         setTimeout(function () {
-          var results = mySkus.map(function (s) {
-            var best = findBestMatch(s.sku, dbItems);
+          // Untuk setiap item distributor, cari SKU referensi terbaik
+          var results = dbItems.map(function (item) {
+            var best = findBestMatchInSkus(item.name, mySkus);
             return {
-              sku: s.sku,
-              rowIndex: s.rowIndex,
-              db_name: best ? best.item.name : null,
-              stock: best ? best.item.stock : null,
-              distributor: best ? best.item.distributor : null,
+              db_name: item.name,
+              stock: item.stock,
+              distributor: item.distributor,
+              sku_matched: best ? best.sku : null,
+              rowIndex: best ? best.rowIndex : null,
               confidence: best ? best.score : 0,
             };
           });
           S.matchResults = results;
-          var matched = results.filter(function (r) {
-            return r.db_name;
-          }).length;
+          var matched = results.filter(function (r) { return r.sku_matched; }).length;
           addLog(
-            "✓ Selesai! " +
-              matched +
-              " dari " +
-              results.length +
-              " SKU berhasil dicocokkan.",
+            "✓ Selesai! " + matched + " dari " + results.length + " item distributor berhasil dicocokkan.",
             "log-ok",
           );
           addLog("→ Membuka tabel konfirmasi...");
@@ -721,309 +738,155 @@
 
       // ---- Fuzzy matching engine ----
       var STOP = {
-        isi: 1,
-        rasa: 1,
-        pcs: 1,
-        bungkus: 1,
-        pack: 1,
-        dus: 1,
-        krt: 1,
-        karton: 1,
-        new: 1,
-        ori: 1,
-        original: 1,
-        non: 1,
-        no: 1,
-        retur: 1,
-        pouch: 1,
-        toples: 1,
-        gr: 1,
-        g: 1,
-        kg: 1,
-        ml: 1,
-        ltr: 1,
-        pc: 1,
+        isi:1,rasa:1,pcs:1,bungkus:1,pack:1,dus:1,krt:1,karton:1,
+        new:1,ori:1,original:1,non:1,no:1,retur:1,pouch:1,toples:1,
+        gr:1,g:1,kg:1,ml:1,ltr:1,pc:1,
       };
-
       var ALIAS = [
-        [
-          [
-            "choco",
-            "coklat",
-            "cokelat",
-            "chocolate",
-            "chocoball",
-            "chocoballs",
-          ],
-          "coklat",
-        ],
-        [["strawberry", "stroberi", "strawbery", "strobery"], "strawberry"],
-        [["ubiungu", "ungu", "ubi"], "ubiungu"],
-        [["seaweed", "rumputlaut", "seawed", "rumput", "laut"], "rumputlaut"],
-        [["keju", "cheese"], "keju"],
-        [["ayam", "chicken"], "ayam"],
-        [["pedas", "pedes", "spicy", "hot"], "pedas"],
-        [["vanilla", "vanila", "vanille"], "vanilla"],
-        [["campursari", "campur", "mixed", "mix"], "campursari"],
-        [["heppi", "happy", "hepi"], "happy"],
-        [["thiny", "tiny"], "thiny"],
-        [["cocopandan", "kopipandan"], "cocopandan"],
-        [["kari", "curry", "kare"], "kari"],
-        [["balado", "balada"], "balado"],
-        [["sapi", "beef"], "sapi"],
-        [["panggang", "bakar", "grilled"], "panggang"],
-        [["money", "mony"], "money"],
-        [["mouse", "maus"], "mouse"],
-        [["nananet", "nanet"], "nananet"],
-        [["ring", "rings"], "ring"],
-        [["ball", "balls", "bola"], "ball"],
+        [["choco","coklat","cokelat","chocolate","chocoball","chocoballs"],"coklat"],
+        [["strawberry","stroberi","strawbery","strobery"],"strawberry"],
+        [["ubiungu","ungu","ubi"],"ubiungu"],
+        [["seaweed","rumputlaut","seawed","rumput","laut"],"rumputlaut"],
+        [["keju","cheese"],"keju"],
+        [["ayam","chicken"],"ayam"],
+        [["pedas","pedes","spicy","hot"],"pedas"],
+        [["vanilla","vanila","vanille"],"vanilla"],
+        [["campursari","campur","mixed","mix"],"campursari"],
+        [["heppi","happy","hepi"],"happy"],
+        [["thiny","tiny"],"thiny"],
+        [["cocopandan","kopipandan"],"cocopandan"],
+        [["kari","curry","kare"],"kari"],
+        [["balado","balada"],"balado"],
+        [["sapi","beef"],"sapi"],
+        [["panggang","bakar","grilled"],"panggang"],
+        [["money","mony"],"money"],
+        [["mouse","maus"],"mouse"],
+        [["nananet","nanet"],"nananet"],
+        [["ring","rings"],"ring"],
+        [["ball","balls","bola"],"ball"],
       ];
-
       function alias(w) {
         for (var i = 0; i < ALIAS.length; i++)
           if (ALIAS[i][0].indexOf(w) >= 0) return ALIAS[i][1];
         return w;
       }
       function norm(s) {
-        return s
-          .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, " ")
-          .replace(/\b\d{1,2}x\d{1,2}\b/g, "")
-          .replace(
-            /\b\d+\s*(pcs|bungkus|pack|gr|g|kg|ml|dus|krt|isi|ltr)\b/g,
-            "",
-          )
-          .replace(/\s+/g, " ")
-          .trim();
+        return s.toLowerCase()
+          .replace(/[^a-z0-9\s]/g," ")
+          .replace(/\b\d{1,2}x\d{1,2}\b/g,"")
+          .replace(/\b\d+\s*(pcs|bungkus|pack|gr|g|kg|ml|dus|krt|isi|ltr)\b/g,"")
+          .replace(/\s+/g," ").trim();
       }
       function tokenize(s) {
-        return s
-          .split(/\s+/)
-          .filter(function (w) {
-            return w.length > 1 && !STOP[w];
-          })
-          .map(function (w) {
-            return alias(w);
-          });
+        return s.split(/\s+/)
+          .filter(function(w){ return w.length > 1 && !STOP[w]; })
+          .map(function(w){ return alias(w); });
       }
-
-      function jaccard(a, b) {
+      function jaccard(a,b) {
         if (!a.length && !b.length) return 1;
         if (!a.length || !b.length) return 0;
-        var sa = {},
-          sb = {},
-          inter = 0;
-        a.forEach(function (t) {
-          sa[t] = 1;
-        });
-        b.forEach(function (t) {
-          sb[t] = 1;
-        });
-        Object.keys(sa).forEach(function (t) {
-          if (sb[t]) inter++;
-        });
-        return (
-          inter / (Object.keys(sa).length + Object.keys(sb).length - inter)
-        );
+        var sa={},sb={},inter=0;
+        a.forEach(function(t){ sa[t]=1; });
+        b.forEach(function(t){ sb[t]=1; });
+        Object.keys(sa).forEach(function(t){ if(sb[t]) inter++; });
+        return inter/(Object.keys(sa).length+Object.keys(sb).length-inter);
       }
-      function bigram(a, b) {
-        function bg(s) {
-          var r = {};
-          for (var i = 0; i < s.length - 1; i++) {
-            var k = s[i] + s[i + 1];
-            r[k] = (r[k] || 0) + 1;
+      function bigram(a,b) {
+        function bg(s){ var r={}; for(var i=0;i<s.length-1;i++){var k=s[i]+s[i+1];r[k]=(r[k]||0)+1;} return r; }
+        var ba=bg(a),bb=bg(b),inter=0,tA=0,tB=0;
+        Object.keys(ba).forEach(function(k){ tA+=ba[k]; if(bb[k]) inter+=Math.min(ba[k],bb[k]); });
+        Object.keys(bb).forEach(function(k){ tB+=bb[k]; });
+        var d=tA+tB-inter; return d>0?inter/d:0;
+      }
+      function prefixScore(a,b) {
+        var shorter=a.length<=b.length?a:b,longer=a.length<=b.length?b:a;
+        if(!shorter.length) return 0;
+        var set={};
+        longer.forEach(function(t){ set[t]=1; });
+        return shorter.filter(function(t){ return set[t]; }).length/shorter.length;
+      }
+      function levenshtein(a,b) {
+        a=a.substring(0,60); b=b.substring(0,60);
+        var la=a.length,lb=b.length;
+        if(!la) return !lb?1:0; if(!lb) return 0;
+        var prev=[],curr=[];
+        for(var j=0;j<=lb;j++) prev[j]=j;
+        for(var i=1;i<=la;i++){
+          curr[0]=i;
+          for(var j2=1;j2<=lb;j2++){
+            var c=a[i-1]===b[j2-1]?0:1;
+            curr[j2]=Math.min(prev[j2]+1,curr[j2-1]+1,prev[j2-1]+c);
           }
-          return r;
+          prev=curr.slice();
         }
-        var ba = bg(a),
-          bb = bg(b),
-          inter = 0,
-          tA = 0,
-          tB = 0;
-        Object.keys(ba).forEach(function (k) {
-          tA += ba[k];
-          if (bb[k]) inter += Math.min(ba[k], bb[k]);
-        });
-        Object.keys(bb).forEach(function (k) {
-          tB += bb[k];
-        });
-        var d = tA + tB - inter;
-        return d > 0 ? inter / d : 0;
+        return 1-prev[lb]/Math.max(la,lb);
       }
-      function prefixScore(a, b) {
-        var shorter = a.length <= b.length ? a : b,
-          longer = a.length <= b.length ? b : a;
-        if (!shorter.length) return 0;
-        var set = {};
-        longer.forEach(function (t) {
-          set[t] = 1;
-        });
-        return (
-          shorter.filter(function (t) {
-            return set[t];
-          }).length / shorter.length
-        );
-      }
-      function levenshtein(a, b) {
-        a = a.substring(0, 60);
-        b = b.substring(0, 60);
-        var la = a.length,
-          lb = b.length;
-        if (!la) return !lb ? 1 : 0;
-        if (!lb) return 0;
-        var prev = [],
-          curr = [];
-        for (var j = 0; j <= lb; j++) prev[j] = j;
-        for (var i = 1; i <= la; i++) {
-          curr[0] = i;
-          for (var j2 = 1; j2 <= lb; j2++) {
-            var c = a[i - 1] === b[j2 - 1] ? 0 : 1;
-            curr[j2] = Math.min(
-              prev[j2] + 1,
-              curr[j2 - 1] + 1,
-              prev[j2 - 1] + c,
-            );
-          }
-          prev = curr.slice();
-        }
-        return 1 - prev[lb] / Math.max(la, lb);
-      }
-      function score(na, nb, ta, tb) {
-        return (
-          jaccard(ta, tb) * 0.45 +
-          bigram(na, nb) * 0.2 +
-          prefixScore(ta, tb) * 0.2 +
-          levenshtein(na, nb) * 0.15
-        );
+      function scoreFunc(na,nb,ta,tb) {
+        return jaccard(ta,tb)*0.45+bigram(na,nb)*0.2+prefixScore(ta,tb)*0.2+levenshtein(na,nb)*0.15;
       }
 
-      function findBestMatch(sku, dbItems) {
-        var na = norm(sku),
-          ta = tokenize(na);
-        var best = null,
-          bestScore = 0;
-        dbItems.forEach(function (item) {
-          var nb = norm(item.name),
-            tb = tokenize(nb);
-          var s = score(na, nb, ta, tb);
-          if (s > bestScore) {
-            bestScore = s;
-            best = item;
-          }
+      // Cari SKU terbaik dari daftar referensi (file stok bulanan) untuk satu nama barang distributor
+      function findBestMatchInSkus(dbName, mySkus) {
+        var na = norm(dbName), ta = tokenize(na);
+        var best = null, bestScore = 0;
+        mySkus.forEach(function(item) {
+          var nb = norm(item.sku), tb = tokenize(nb);
+          var s = scoreFunc(na, nb, ta, tb);
+          if (s > bestScore) { bestScore = s; best = item; }
         });
         if (bestScore < 0.2) return null;
-        return { item: best, score: Math.round(bestScore * 100) / 100 };
+        return { sku: best.sku, rowIndex: best.rowIndex, score: Math.round(bestScore*100)/100 };
       }
 
       // ============================================================
       // STEP 4 — KONFIRMASI
       // ============================================================
       function buildConfirmTable() {
-        var matched = S.matchResults.filter(function (r) {
-          return r.db_name;
-        }).length;
+        var matched = S.matchResults.filter(function(r){ return r.sku_matched; }).length;
         var skipped = S.matchResults.length - matched;
         updateSummary(matched, skipped);
 
-        var distribNames = [
-          ...new Set(
-            S.distributors.map(function (d) {
-              return d.name;
-            }),
-          ),
-        ];
+        var distribNames = [...new Set(S.distributors.map(function(d){ return d.name; }))];
         document.getElementById("filterDistrib").innerHTML =
           '<option value="">Semua distributor</option>' +
-          distribNames
-            .map(function (n) {
-              return '<option value="' + n + '">' + n + "</option>";
-            })
-            .join("");
+          distribNames.map(function(n){ return '<option value="'+n+'">'+n+"</option>"; }).join("");
 
-        // All DB items for dropdown
-        var allDb = [];
-        S.distributors.forEach(function (d) {
-          d.parsed.rows.forEach(function (row) {
-            var n = (row[d.colName] || "").trim(),
-              s = (row[d.colStock] || "").trim();
-            if (n) allDb.push({ name: n, stock: s, distributor: d.name });
-          });
-        });
-        // Group by distributor for optgroup
-        var grp = {};
-        allDb.forEach(function (d) {
-          if (!grp[d.distributor]) grp[d.distributor] = [];
-          grp[d.distributor].push(d);
+        // Daftar SKU dari file stok bulanan untuk dropdown
+        var mySkus = [];
+        S.myFile.parsed.rows.forEach(function(row, ri) {
+          var sku = (row[S.myColSku] || "").trim();
+          if (sku && sku.toUpperCase() !== "TOTAL") mySkus.push({ sku: sku, rowIndex: ri });
         });
 
         var tbody = document.getElementById("matchTbody");
         tbody.innerHTML = "";
-        S.matchResults.forEach(function (r, idx) {
+        S.matchResults.forEach(function(r, idx) {
           var pct = Math.round((r.confidence || 0) * 100);
-          var cc =
-            pct >= 80 ? "conf-high" : pct >= 50 ? "conf-mid" : "conf-low";
-          var opts = '<option value="">— Tidak ada pasangan —</option>';
-          Object.keys(grp).forEach(function (dn) {
-            opts += '<optgroup label="' + esc(dn) + '">';
-            grp[dn].forEach(function (d) {
-              var sel =
-                r.db_name === d.name && r.distributor === d.distributor
-                  ? "selected"
-                  : "";
-              opts +=
-                '<option value="' +
-                esc(dn) +
-                "||" +
-                esc(d.name) +
-                "||" +
-                esc(d.stock) +
-                '" ' +
-                sel +
-                ">" +
-                esc(d.name) +
-                " (" +
-                esc(d.stock) +
-                ")</option>";
-            });
-            opts += "</optgroup>";
-          });
+          var cc = pct >= 80 ? "conf-high" : pct >= 50 ? "conf-mid" : "conf-low";
+          var skuOpts = '<option value="">— Tidak ada pasangan —</option>' +
+            mySkus.map(function(s) {
+              var sel = r.sku_matched === s.sku ? "selected" : "";
+              return '<option value="' + s.rowIndex + "||" + esc(s.sku) + '" ' + sel + '>' + esc(s.sku) + '</option>';
+            }).join("");
+
           var stockHtml = r.stock
             ? '<span class="stock-pill sp-matched">' + esc(r.stock) + "</span>"
             : '<span class="stock-pill sp-none">—</span>';
+
           var tr = document.createElement("tr");
           tr.dataset.idx = idx;
-          tr.dataset.sku = r.sku.toLowerCase();
+          tr.dataset.sku = (r.db_name || "").toLowerCase();
           tr.dataset.conf = pct;
           tr.dataset.distrib = r.distributor || "";
           tr.innerHTML =
-            '<td style="color:var(--text3);font-size:12px">' +
-            (idx + 1) +
-            "</td>" +
-            '<td><div class="sku-cell">' +
-            esc(r.sku) +
-            "</div></td>" +
-            '<td><select class="db-sel" onchange="onMatchChange(' +
-            idx +
-            ',this.value)">' +
-            opts +
-            "</select></td>" +
-            '<td id="stk' +
-            idx +
-            '">' +
-            stockHtml +
-            "</td>" +
-            '<td><div class="conf-wrap ' +
-            cc +
-            '">' +
-            '<div class="conf-bar"><div class="conf-fill" style="width:' +
-            pct +
-            '%"></div></div>' +
-            '<div class="conf-pct">' +
-            pct +
-            "%</div></div></td>" +
-            '<td style="font-size:12px;color:var(--text3)">' +
-            esc(r.distributor || "—") +
-            "</td>";
+            '<td style="color:var(--text3);font-size:12px">' + (idx + 1) + "</td>" +
+            '<td><div class="sku-cell">' + esc(r.db_name) + "</div></td>" +
+            '<td style="font-size:12px;color:var(--text3)">' + esc(r.distributor || "—") + "</td>" +
+            '<td><select class="db-sel" onchange="onMatchChange(' + idx + ',this.value)">' + skuOpts + "</select></td>" +
+            '<td id="stk' + idx + '">' + stockHtml + "</td>" +
+            '<td><div class="conf-wrap ' + cc + '">' +
+            '<div class="conf-bar"><div class="conf-fill" style="width:' + pct + '%"></div></div>' +
+            '<div class="conf-pct">' + pct + "%</div></div></td>";
           tbody.appendChild(tr);
         });
       }
@@ -1031,42 +894,29 @@
       function onMatchChange(idx, val) {
         var r = S.matchResults[idx];
         if (!val) {
-          r.db_name = null;
-          r.stock = null;
-          r.distributor = null;
+          r.sku_matched = null;
+          r.rowIndex = null;
         } else {
           var p = val.split("||");
-          r.distributor = p[0];
-          r.db_name = p[1];
-          r.stock = p[2];
+          r.rowIndex = parseInt(p[0]);
+          r.sku_matched = p[1];
         }
-        document.getElementById("stk" + idx).innerHTML = r.stock
-          ? '<span class="stock-pill sp-matched">' + esc(r.stock) + "</span>"
-          : '<span class="stock-pill sp-none">—</span>';
-        var m = S.matchResults.filter(function (x) {
-          return x.db_name;
-        }).length;
+        var m = S.matchResults.filter(function(x){ return x.sku_matched; }).length;
         updateSummary(m, S.matchResults.length - m);
       }
 
       function updateSummary(m, s) {
         document.getElementById("summaryGrid").innerHTML =
-          '<div class="sum-box sum-green"><div class="sum-num">' +
-          m +
-          '</div><div class="sum-lbl">Berhasil cocok</div></div>' +
-          '<div class="sum-box sum-amber"><div class="sum-num">' +
-          s +
-          '</div><div class="sum-lbl">Tidak ada pasangan</div></div>' +
-          '<div class="sum-box"><div class="sum-num">' +
-          S.matchResults.length +
-          '</div><div class="sum-lbl">Total SKU</div></div>';
+          '<div class="sum-box sum-green"><div class="sum-num">' + m + '</div><div class="sum-lbl">Berhasil cocok</div></div>' +
+          '<div class="sum-box sum-amber"><div class="sum-num">' + s + '</div><div class="sum-lbl">Tidak ada pasangan</div></div>' +
+          '<div class="sum-box"><div class="sum-num">' + S.matchResults.length + '</div><div class="sum-lbl">Total item distributor</div></div>';
       }
 
       function filterTable() {
         var q = (document.getElementById("filterQ").value || "").toLowerCase();
         var cf = document.getElementById("filterConf").value;
         var di = document.getElementById("filterDistrib").value;
-        document.querySelectorAll("#matchTbody tr").forEach(function (tr) {
+        document.querySelectorAll("#matchTbody tr").forEach(function(tr) {
           var show = true;
           if (q && tr.dataset.sku.indexOf(q) < 0) show = false;
           if (di && tr.dataset.distrib !== di) show = false;
@@ -1082,100 +932,77 @@
       function sortTable(val) {
         var tbody = document.getElementById("matchTbody");
         var rows = Array.from(tbody.querySelectorAll("tr"));
-        rows.sort(function (a, b) {
-          if (val === "conf-asc")
-            return parseInt(a.dataset.conf) - parseInt(b.dataset.conf);
-          if (val === "conf-desc")
-            return parseInt(b.dataset.conf) - parseInt(a.dataset.conf);
-          if (val === "distrib")
-            return a.dataset.distrib.localeCompare(b.dataset.distrib);
+        rows.sort(function(a, b) {
+          if (val === "conf-asc") return parseInt(a.dataset.conf) - parseInt(b.dataset.conf);
+          if (val === "conf-desc") return parseInt(b.dataset.conf) - parseInt(a.dataset.conf);
+          if (val === "distrib") return a.dataset.distrib.localeCompare(b.dataset.distrib);
           return parseInt(a.dataset.idx) - parseInt(b.dataset.idx);
         });
-        rows.forEach(function (r) {
-          tbody.appendChild(r);
-        });
+        rows.forEach(function(r){ tbody.appendChild(r); });
       }
 
       // ============================================================
       // STEP 5 — EXPORT
+      // Isi STOK END CLOSING di file stok bulanan berdasarkan matching
       // ============================================================
       function goToStep5() {
-        var m = S.matchResults.filter(function (r) {
-          return r.db_name;
-        }).length;
+        var m = S.matchResults.filter(function(r){ return r.sku_matched; }).length;
         document.getElementById("exportSummary").textContent =
-          m +
-          " dari " +
-          S.matchResults.length +
-          " SKU berhasil dicocokkan dan akan diisi otomatis.";
+          m + " dari " + S.matchResults.length + " item distributor berhasil dicocokkan dan akan diisi ke file stok bulanan.";
         goToPage(5);
       }
 
       function exportExcel() {
         var parsed = S.myFile.parsed;
-        var skuToStock = {};
-        S.matchResults.forEach(function (r) {
-          if (r.db_name && r.stock) skuToStock[r.sku] = r.stock;
+
+        // Buat map: rowIndex → stock (dari hasil matching)
+        // Jika satu baris SKU diklaim oleh beberapa item distributor, ambil yang confidence tertinggi
+        var rowToStock = {};
+        S.matchResults.forEach(function(r) {
+          if (r.sku_matched && r.stock && r.rowIndex !== null) {
+            var existing = rowToStock[r.rowIndex];
+            if (!existing || r.confidence > existing.confidence) {
+              rowToStock[r.rowIndex] = { stock: r.stock, confidence: r.confidence };
+            }
+          }
         });
 
         var sheetData = [parsed.headers];
-        parsed.rows.forEach(function (row) {
+        parsed.rows.forEach(function(row, ri) {
           var newRow = row.slice();
-          var sku = (newRow[S.myColSku] || "").trim();
-          if (skuToStock[sku] !== undefined)
-            newRow[S.myColStokEnd] = skuToStock[sku];
+          if (rowToStock[ri] !== undefined) {
+            newRow[S.myColStokEnd] = rowToStock[ri].stock;
+          }
           sheetData.push(newRow);
         });
 
         var ws = XLSX.utils.aoa_to_sheet(sheetData);
-        ws["!cols"] = parsed.headers.map(function (h) {
-          return { wch: Math.max(h.length + 4, 14) };
-        });
+        ws["!cols"] = parsed.headers.map(function(h){ return { wch: Math.max(h.length + 4, 14) }; });
 
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Stok Monthly");
 
-        var mapData = [
-          ["SKU Kamu", "Distributor", "Nama Barang DB", "Stock Akhir", "Skor"],
-        ];
-        S.matchResults.forEach(function (r) {
-          mapData.push([
-            r.sku,
-            r.distributor || "",
-            r.db_name || "",
-            r.stock || "",
-            Math.round((r.confidence || 0) * 100) + "%",
-          ]);
+        // Sheet mapping log
+        var mapData = [["Nama Barang Distributor","Distributor","SKU Referensi (Kamu)","Stock Akhir","Skor"]];
+        S.matchResults.forEach(function(r) {
+          mapData.push([r.db_name, r.distributor || "", r.sku_matched || "", r.stock || "", Math.round((r.confidence||0)*100)+"%"]);
         });
         var wsMap = XLSX.utils.aoa_to_sheet(mapData);
-        wsMap["!cols"] = [50, 20, 40, 15, 8].map(function (w) {
-          return { wch: w };
-        });
+        wsMap["!cols"] = [40,20,40,15,8].map(function(w){ return {wch:w}; });
         XLSX.utils.book_append_sheet(wb, wsMap, "Mapping Log");
 
         var now = new Date();
-        var ds =
-          now.getFullYear() +
-          "" +
-          pad(now.getMonth() + 1) +
-          "" +
-          pad(now.getDate());
+        var ds = now.getFullYear() + "" + pad(now.getMonth()+1) + "" + pad(now.getDate());
         XLSX.writeFile(wb, "stok_monthly_" + ds + ".xlsx");
         document.getElementById("exportDone").style.display = "block";
       }
 
       function startOver() {
-        S = {
-          myFile: null,
-          myColSku: 0,
-          myColStokEnd: 0,
-          distributors: [],
-          matchResults: [],
-        };
+        S = { myFile: null, myColSku: 0, myColStokEnd: 0, distributors: [], matchResults: [] };
         document.getElementById("myFile").value = "";
         document.getElementById("dbFile").value = "";
         renderMyFileInfo();
-        renderDistribList();
+        renderDbFileList();
         document.getElementById("btnStep2").disabled = true;
         goToPage(1);
       }
@@ -1184,41 +1011,25 @@
       // HELPERS
       // ============================================================
       function goToPage(n) {
-        document.querySelectorAll(".page").forEach(function (p) {
-          p.classList.remove("active");
-        });
+        document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
         document.getElementById("page" + n).classList.add("active");
-        ["nav1", "nav2", "nav3", "nav4", "nav5"].forEach(function (id, i) {
+        ["nav1","nav2","nav3","nav4","nav5"].forEach(function(id, i) {
           var el = document.getElementById(id);
-          el.classList.remove("active", "done");
-          if (i + 1 === n) el.classList.add("active");
-          else if (i + 1 < n) el.classList.add("done");
+          el.classList.remove("active","done");
+          if (i+1===n) el.classList.add("active");
+          else if (i+1<n) el.classList.add("done");
         });
-        window.scrollTo(0, 0);
+        window.scrollTo(0,0);
       }
       function showLoader(t) {
         document.getElementById("loaderText").textContent = t || "Memproses...";
         document.getElementById("loader").classList.add("show");
       }
-      function hideLoader() {
-        document.getElementById("loader").classList.remove("show");
-      }
-      function showMsg(id, msg, type) {
-        var el = document.getElementById(id);
-        el.className = "alert alert-" + type;
-        el.textContent = msg;
-        el.style.display = "block";
-      }
+      function hideLoader() { document.getElementById("loader").classList.remove("show"); }
       function esc(s) {
-        return String(s)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
+        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       }
-      function pad(n) {
-        return n < 10 ? "0" + n : n;
-      }
+      function pad(n) { return n < 10 ? "0" + n : n; }
     </script>
   </body>
 </html>
