@@ -891,7 +891,7 @@
           </div>
 
           <!-- Export format selector (only shown when template active) -->
-          <!-- <div
+          <div
             id="export-format-section"
             class="hidden"
             style="margin-top: 1rem"
@@ -948,7 +948,7 @@
                 </div>
               </button>
             </div>
-          </div> -->
+          </div>
 
           <div class="btn-row">
             <button class="btn btn-primary" id="btn-export">
@@ -3082,11 +3082,16 @@
             .join("");
         }
 
-        // Format sudah dipilih di Step 2 — tidak perlu show/hide lagi di sini
-        // Hanya sinkronkan default jika user belum pernah ke Step 2 (fallback)
-        if (!exportMode) {
-          selectExportMode(periodMode === "total" ? "flat" : "template");
-        }
+        // Show format selector — always show since we now always have RO mode
+        $("export-format-section").classList.remove("hidden");
+        // Total mode defaults to FLAT (single merged sheet, matches the
+        // combined Excel); auto/manual default to per-distributor RO.
+        selectExportMode(periodMode === "total" ? "flat" : "template");
+
+        // // Format sudah dipilih di Step 2 — tidak perlu show/hide lagi di sini
+        // // Hanya sinkronkan default jika user belum pernah ke Step 2 (fallback)
+        // if (!exportMode)
+        //   selectExportMode(periodMode === "total" ? "flat" : "template");
       }
 
       $("btn-cancel").addEventListener("click", () => {
