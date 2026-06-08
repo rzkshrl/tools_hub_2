@@ -1036,6 +1036,7 @@
       //   slot ∈ {dist,salesman,cust,bulan,barang,qty,satuan,jumlah,null}
       let tplRefColumns = []; // [] → fall back to built-in default layout
       let tplRefSheetName = null;
+      let tplExtraSlots = []; // [{id, label}] — slot dinamis dari kolom template yg tak dikenali
 
       // Period state
       let periodMode = "auto"; // 'auto' | 'manual' | 'total'
@@ -1570,9 +1571,34 @@
             if (ref) {
               tplRefColumns = ref.columns;
               tplRefSheetName = ref.sheetName;
+              // Daftarkan kolom template yg tidak dikenali sebagai extra slots dinamis
+              tplExtraSlots = [];
+              ref.columns.forEach((c) => {
+                if (!c.slot && !c.isMonth && c.header) {
+                  const id =
+                    "x_" + c.header.toLowerCase().replace(/[^a-z0-9]/g, "_");
+                  if (
+                    !COL_SLOTS.includes(id) &&
+                    !tplExtraSlots.find((s) => s.id === id)
+                  ) {
+                    tplExtraSlots.push({ id, label: c.header });
+                    tplRefColumns = tplRefColumns.map((c) => {
+                      if (!c.slot && !c.isMonth && c.header) {
+                        const id =
+                          "x_" +
+                          c.header.toLowerCase().replace(/[^a-z0-9]/g, "_");
+                        const extra = tplExtraSlots.find((s) => s.id === id);
+                        if (extra) return { ...c, slot: extra.id };
+                      }
+                      return c;
+                    });
+                  }
+                }
+              });
             } else {
               tplRefColumns = [];
               tplRefSheetName = null;
+              tplExtraSlots = [];
             }
           } catch (_) {
             tplRefColumns = [];
@@ -1644,6 +1670,7 @@
         tplDataSheetName = null;
         tplRefColumns = [];
         tplRefSheetName = null;
+        tplExtraSlots = [];
         tplActive = false;
         tplZone.classList.remove("hidden");
         $("tpl-selected").classList.add("hidden");
@@ -2263,10 +2290,13 @@
           });
           if (data.length > 1) {
             const hn = (data[0] || []).map((v) =>
-              String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+              String(v || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, ""),
             );
             const findCol = (exact, partial, avoid) => {
-              const banned = (i) => (avoid || []).some((a) => hn[i].includes(a));
+              const banned = (i) =>
+                (avoid || []).some((a) => hn[i].includes(a));
               for (const a of exact) {
                 const i = hn.findIndex((h, j) => h === a && !banned(j));
                 if (i >= 0) return i;
@@ -2281,13 +2311,16 @@
               ["namapelanggan", "namacustomer", "nmcust"],
               ["pelanggan", "customer"],
             );
-            const brgIdx = findCol(["namabarang", "namaproduk"], ["namabarang"]);
-            const qtyIdx = findCol(["kuantitas", "qty"], ["kuantitas", "qty"], [
-              "jumlahrp",
-            ]);
-            const satIdx = findCol(["satuan", "sat"], ["satuan"], [
-              "hargasat",
-            ]);
+            const brgIdx = findCol(
+              ["namabarang", "namaproduk"],
+              ["namabarang"],
+            );
+            const qtyIdx = findCol(
+              ["kuantitas", "qty"],
+              ["kuantitas", "qty"],
+              ["jumlahrp"],
+            );
+            const satIdx = findCol(["satuan", "sat"], ["satuan"], ["hargasat"]);
             const jmlIdx = findCol(
               ["dpp", "penjualan", "neto", "subtotal"],
               ["dpp", "penjualan"],
@@ -3346,7 +3379,12 @@
               if (key) {
                 // RO mode: each transacting customer counts as 1 (distinct
                 // outlet), regardless of how many transactions/qty it had.
-                total += valueMode === "ro" ? (monthMap[key] > 0 ? 1 : 0) : monthMap[key];
+                total +=
+                  valueMode === "ro"
+                    ? monthMap[key] > 0
+                      ? 1
+                      : 0
+                    : monthMap[key];
               }
             });
             return total || null;
@@ -3561,7 +3599,9 @@
           const aoa = [colPlan.map((c) => c.header)];
           if (rows.length) {
             rows.forEach((r) =>
-              aoa.push(colPlan.map((c) => cellForWithDist(r, c.field, displayName))),
+              aoa.push(
+                colPlan.map((c) => cellForWithDist(r, c.field, displayName)),
+              ),
             );
           } else {
             aoa.push(
@@ -4410,7 +4450,17 @@
       //             last resort for Bravo, never a rupiah column.
       const COL_RULES = {
         cust: {
-          exact: ["namacustomer", "namapelanggan", "nmcust", "customer", "pelanggan", "namatoko", "listcustomer", "custnm", "namacust"],
+          exact: [
+            "namacustomer",
+            "namapelanggan",
+            "nmcust",
+            "customer",
+            "pelanggan",
+            "namatoko",
+            "listcustomer",
+            "custnm",
+            "namacust",
+          ],
           partial: ["pelanggan", "customer", "namatoko", "outlet"],
           avoid: ["kodecustomer", "kodecust", "custid", "kodepelanggan"],
         },
@@ -4420,27 +4470,87 @@
           avoid: [],
         },
         barang: {
-          exact: ["namabarang", "namaproduk", "namaproduct", "nmbrg", "nmbarang", "namaitem", "nmproduk", "namabrg"],
+          exact: [
+            "namabarang",
+            "namaproduk",
+            "namaproduct",
+            "nmbrg",
+            "nmbarang",
+            "namaitem",
+            "nmproduk",
+            "namabrg",
+          ],
           partial: ["namabarang", "namaproduk", "namaproduct", "namaitem"],
           avoid: [],
         },
         qty: {
-          exact: ["qtysoldtotalpcs", "qty", "kuantitas", "qtyfaktur", "quantity", "qyt", "jumlah"],
+          exact: [
+            "qtysoldtotalpcs",
+            "qty",
+            "kuantitas",
+            "qtyfaktur",
+            "quantity",
+            "qyt",
+            "jumlah",
+          ],
           partial: ["kuantitas", "qtytotalpcs", "qty"],
-          avoid: ["jumlahrp", "jumlahrupiah", "qtysoldcrt", "qtysolduom1", "qtysolduom2", "qtysolduom3", "qtyorder", "qtyterbesar", "qtyterkecil"],
+          avoid: [
+            "jumlahrp",
+            "jumlahrupiah",
+            "qtysoldcrt",
+            "qtysolduom1",
+            "qtysolduom2",
+            "qtysolduom3",
+            "qtyorder",
+            "qtyterbesar",
+            "qtyterkecil",
+          ],
         },
         satuan: {
           exact: ["satuan", "sat", "uom", "unit", "satuanfaktur"],
           partial: ["satuan", "unit"],
-          avoid: ["satuanterbesar", "satuanterkecil", "hgsatuan", "hargasatuan", "hargasat"],
+          avoid: [
+            "satuanterbesar",
+            "satuanterkecil",
+            "hgsatuan",
+            "hargasatuan",
+            "hargasat",
+          ],
         },
         jumlah: {
-          exact: ["dpp", "dppvalue", "neto", "netto", "netamount", "subtotal", "subtotalrp", "nilai", "jumlahrupiah"],
+          exact: [
+            "dpp",
+            "dppvalue",
+            "neto",
+            "netto",
+            "netamount",
+            "subtotal",
+            "subtotalrp",
+            "nilai",
+            "jumlahrupiah",
+          ],
           partial: ["dpp", "neto", "subtotal"],
-          avoid: ["disc", "diskon", "ppn", "potongan", "hargasat", "hargasatuan"],
+          avoid: [
+            "disc",
+            "diskon",
+            "ppn",
+            "potongan",
+            "hargasat",
+            "hargasatuan",
+          ],
         },
         salesman: {
-          exact: ["namasalesman", "namasales", "salesman", "nmsales", "sales", "penjual", "namatenagapenjual", "kodesalesman", "nmslm"],
+          exact: [
+            "namasalesman",
+            "namasales",
+            "salesman",
+            "nmsales",
+            "sales",
+            "penjual",
+            "namatenagapenjual",
+            "kodesalesman",
+            "nmslm",
+          ],
           partial: ["salesman", "namasales", "penjual", "tenagapenjual"],
           avoid: [],
         },
@@ -4468,9 +4578,28 @@
       }
       // Stopwords that carry no identifying signal for distributor names.
       const DIST_STOPWORDS = new Set([
-        "cv", "pt", "ud", "tbk", "persada", "group", "grup", "distribusi",
-        "distributor", "jaya", "abadi", "sukses", "utama", "perkasa", "mega",
-        "indonesia", "the", "and", "dan", "kota", "kabupaten", "kab",
+        "cv",
+        "pt",
+        "ud",
+        "tbk",
+        "persada",
+        "group",
+        "grup",
+        "distribusi",
+        "distributor",
+        "jaya",
+        "abadi",
+        "sukses",
+        "utama",
+        "perkasa",
+        "mega",
+        "indonesia",
+        "the",
+        "and",
+        "dan",
+        "kota",
+        "kabupaten",
+        "kab",
       ]);
       function distTokens(s) {
         return new Set(
@@ -4480,7 +4609,9 @@
             .replace(/\s+/g, " ")
             .trim()
             .split(" ")
-            .filter((w) => w.length > 2 && !DIST_STOPWORDS.has(w.toLowerCase())),
+            .filter(
+              (w) => w.length > 2 && !DIST_STOPWORDS.has(w.toLowerCase()),
+            ),
         );
       }
       // Match a template distributor name to one of the data group keys.
@@ -4524,7 +4655,10 @@
           const ratio = overlap / Math.min(tt.size, kt.size);
           // Choose by ratio, breaking ties by the higher absolute overlap
           // (so "...- GRESIK" with 2 shared tokens beats a 1-token coincidence).
-          if (ratio > bestRatio || (ratio === bestRatio && overlap > bestOverlap)) {
+          if (
+            ratio > bestRatio ||
+            (ratio === bestRatio && overlap > bestOverlap)
+          ) {
             bestRatio = ratio;
             bestOverlap = overlap;
             best = k;
@@ -4545,12 +4679,18 @@
         const tests = [
           ["dist", /(namadistributor|distributor|namadb)/],
           ["salesman", /(salesman|namasales|tenagapenjual|penjual|sales)/],
-          ["cust", /(namacustomer|namapelanggan|customer|pelanggan|namatoko|outlet)/],
+          [
+            "cust",
+            /(namacustomer|namapelanggan|customer|pelanggan|namatoko|outlet)/,
+          ],
           ["bulan", /(bulan|periode|month)/],
           ["barang", /(namabarang|namaproduk|namaproduct|barang|produk|item)/],
           ["satuan", /(satuan|^sat$|uom|unit)/],
           ["qty", /(qty|kuantitas|quantity)/],
-          ["jumlah", /(dpp|jumlah|nilai|neto|netto|subtotal|amount|total|nominal|rupiah|value)/],
+          [
+            "jumlah",
+            /(dpp|jumlah|nilai|neto|netto|subtotal|amount|total|nominal|rupiah|value)/,
+          ],
         ];
         for (const [slot, re] of tests) if (re.test(h)) return slot;
         return null;
@@ -4601,9 +4741,7 @@
           // Prefer: recognizes many slots, HAS a customer col, FEW data rows
           // (a pure layout/header sheet). Penalize sheets full of data.
           const score =
-            recognized * 10 +
-            (hasCust ? 25 : 0) -
-            Math.min(dataRows, 50) * 0.5;
+            recognized * 10 + (hasCust ? 25 : 0) - Math.min(dataRows, 50) * 0.5;
           if (score > bestScore && recognized >= 3 && hasCust) {
             bestScore = score;
             best = { sheetName: sn, header, slots, hdrRow };
@@ -4767,8 +4905,7 @@
           );
         // Raw-transaction signal: a date/month column AND a qty column. Pivots
         // usually lack a per-row qty/tanggal, so this favours the real data.
-        const isTxn = (h) =>
-          /tanggal|tgl|^date$|bulan|kuantitas|^qty/.test(h);
+        const isTxn = (h) => /tanggal|tgl|^date$|bulan|kuantitas|^qty/.test(h);
         let best = wb.SheetNames[0],
           bestScore = -1;
         wb.SheetNames.forEach((sn) => {
@@ -4893,14 +5030,20 @@
 
         // Assign value/identity slots first so each reserves its column,
         // preventing a later slot from stealing it.
-        ["jumlah", "qty", "satuan", "barang", "cust", "salesman", "bulan"].forEach(
-          (slot) => {
-            let idx = matchRule(COL_RULES[slot]);
-            if (slot === "barang" && idx < 0) idx = matchRule(BARANG_KODE);
-            map[slot] = idx;
-            if (idx >= 0) used.add(idx);
-          },
-        );
+        [
+          "jumlah",
+          "qty",
+          "satuan",
+          "barang",
+          "cust",
+          "salesman",
+          "bulan",
+        ].forEach((slot) => {
+          let idx = matchRule(COL_RULES[slot]);
+          if (slot === "barang" && idx < 0) idx = matchRule(BARANG_KODE);
+          map[slot] = idx;
+          if (idx >= 0) used.add(idx);
+        });
 
         // Bulan fallback: no month-text column → use a date/tanggal column
         // (converted to month name later during extraction).
@@ -5165,7 +5308,11 @@
         </div>
         <div class="colmap-grid">`;
 
-        COL_SLOTS.forEach((slot) => {
+        const activeSlots = [
+          ...COL_SLOTS.map((id) => ({ id, label: COL_LABELS[id] })),
+          ...tplExtraSlots,
+        ];
+        activeSlots.forEach(({ id: slot, label: slotLabel }) => {
           const curIdx = m.colMap[slot] ?? -1;
           const sampleVal =
             curIdx >= 0 && m.sampleRow ? m.sampleRow[curIdx] : null;
@@ -5183,7 +5330,7 @@
             .join("");
           html += `<div>
             <div class="colmap-row">
-              <span class="colmap-label">${COL_LABELS[slot]}</span>
+              <span class="colmap-label">${slotLabel}</span>
               <select class="map-sel" style="flex:1" data-idx="${idx}" data-slot="${slot}" onchange="onColMapChange(this)">${slotOpts}</select>
             </div>
             <div class="colmap-preview" title="${esc(sampleStr)}">▸ ${esc(sampleStr)}</div>
@@ -5371,6 +5518,10 @@
               salesman:
                 colMap.salesman >= 0 ? str(col(r, colMap.salesman)) : "",
             };
+            // Extract extra slots dinamis dari template (mis. NOTA, dll)
+            tplExtraSlots.forEach(({ id }) => {
+              o[id] = colMap[id] >= 0 ? str(col(r, colMap[id])) : "";
+            });
             if (cabangIdx >= 0) {
               const cb = str(col(r, cabangIdx));
               if (cb) o.cabang = cb;
