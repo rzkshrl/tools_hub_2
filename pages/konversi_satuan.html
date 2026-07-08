@@ -296,6 +296,8 @@
               <option value="ok">✓ Berhasil</option>
               <option value="no-rule">⚠ Tdk ada aturan</option>
               <option value="unknown-unit">✕ Satuan tdk dikenal</option>
+              <option value="empty-qty">○ QTY kosong</option>
+              <option value="bad-row">🗑 Baris rusak</option>
             </select>
           </div>
         </div>
@@ -601,9 +603,12 @@
           satuan: [
             { unit: "Rtg", perDus: 8 },
             { unit: "Renceng", perDus: 8 },
+            { unit: "Pak", perDus: 8 },
             { unit: "Pcs", perDus: 80 },
             { unit: "DsK", perDus: 8 },
             { unit: "Karton", perDus: 8 },
+            { unit: "Box", perDus: 1 },
+            { unit: "Dus", perDus: 1 },
           ],
         },
         {
@@ -613,9 +618,12 @@
           satuan: [
             { unit: "Rtg", perDus: 4 },
             { unit: "Renceng", perDus: 4 },
+            { unit: "Pak", perDus: 4 },
             { unit: "Pcs", perDus: 40 },
             { unit: "DsK", perDus: 4 },
             { unit: "Karton", perDus: 4 },
+            { unit: "Box", perDus: 1 },
+            { unit: "Dus", perDus: 1 },
           ],
         },
         {
@@ -625,9 +633,12 @@
           satuan: [
             { unit: "DsK", perDus: 6 },
             { unit: "Duplex", perDus: 6 },
+            { unit: "Pak", perDus: 6 },
             { unit: "Pcs", perDus: 144 },
             { unit: "Rtg", perDus: 6 },
             { unit: "Karton", perDus: 6 },
+            { unit: "Box", perDus: 1 },
+            { unit: "Dus", perDus: 1 },
           ],
         },
         {
@@ -637,7 +648,10 @@
           satuan: [
             { unit: "DsK", perDus: 6 },
             { unit: "Duplex", perDus: 6 },
+            { unit: "Pak", perDus: 6 },
             { unit: "Pcs", perDus: 90 },
+            { unit: "Box", perDus: 1 },
+            { unit: "Dus", perDus: 1 },
           ],
         },
       ];
@@ -1035,16 +1049,34 @@
         return null;
       }
 
-      function conv(qty, satuan, rule) {
+      function conv(qty, satuan, rule, nama, qtyRaw) {
+        // Baris rusak: nama barang kosong / "0"
+        const namaClean = (nama || "").trim();
+        if (namaClean === "" || namaClean === "0")
+          return {
+            dus: null,
+            status: "bad-row",
+            detail: "Baris rusak (nama barang kosong/0) — dibuang",
+          };
+        // QTY kosong di sumber (bukan angka 0 sungguhan)
+        const rawStr =
+          qtyRaw === undefined || qtyRaw === null ? "" : String(qtyRaw).trim();
+        if (rawStr === "")
+          return {
+            dus: null,
+            status: "empty-qty",
+            detail: "QTY kosong di sumber",
+          };
+        const s = satuan.trim();
+        // DUS selalu 1:1, tidak perlu aturan
+        if (s.toLowerCase() === "dus")
+          return { dus: qty, status: "ok", detail: `${qty} Dus = ${qty} Dus` };
         if (!rule)
           return {
             dus: null,
             status: "no-rule",
             detail: "Tidak ada aturan yang cocok",
           };
-        const s = satuan.trim();
-        if (s.toLowerCase() === "dus")
-          return { dus: qty, status: "ok", detail: `${qty} Dus = ${qty} Dus` };
         const m = rule.satuan.find(
           (x) => x.unit.toLowerCase() === s.toLowerCase(),
         );
@@ -1080,10 +1112,17 @@
           convertedData = rawData.map((row, i) => {
             const nama = String(row[colN] || "");
             const satuan = String(row[colS] || "");
+            const qtyRaw = row[colQ];
             const qty =
-              parseFloat(String(row[colQ]).replace(/[^0-9.\-]/g, "")) || 0;
+              parseFloat(String(qtyRaw).replace(/[^0-9.\-]/g, "")) || 0;
             const rule = getRule(nama);
-            const { dus, status, detail } = conv(qty, satuan, rule);
+            const { dus, status, detail } = conv(
+              qty,
+              satuan,
+              rule,
+              nama,
+              qtyRaw,
+            );
             return {
               ...row,
               _idx: i + 1,
@@ -1252,19 +1291,28 @@
         const unkU = convertedData.filter(
           (r) => r._status === "unknown-unit",
         ).length;
+        const emptyQ = convertedData.filter(
+          (r) => r._status === "empty-qty",
+        ).length;
+        const badR = convertedData.filter(
+          (r) => r._status === "bad-row",
+        ).length;
         const totalDus = convertedData.reduce((s, r) => s + (r._dus || 0), 0);
         const totalQty = convertedData.reduce((s, r) => s + r._qty, 0);
+        // Baris yang benar-benar bisa dikonversi (kecualikan baris rusak & qty kosong)
+        const convertible = total - badR - emptyQ;
 
         document.getElementById("statRow").innerHTML = `
     <div class="stat"><span class="stat-val">${total.toLocaleString("id-ID")}</span><span class="stat-lbl">Total Baris</span></div>
     <div class="stat"><span class="stat-val" style="color:var(--accent)">${ok.toLocaleString("id-ID")}</span><span class="stat-lbl">Berhasil</span></div>
     <div class="stat"><span class="stat-val" style="color:var(--warn)">${(noRule + unkU).toLocaleString("id-ID")}</span><span class="stat-lbl">Perlu Cek</span></div>
+    <div class="stat"><span class="stat-val" style="color:var(--text-muted)">${(emptyQ + badR).toLocaleString("id-ID")}</span><span class="stat-lbl">Kosong/Rusak</span></div>
     <div class="stat"><span class="stat-val" style="color:var(--info)">${fmt(totalDus, 2)}</span><span class="stat-lbl">Total Dus</span></div>`;
-        const pct = total > 0 ? Math.round((ok / total) * 100) : 0;
+        const pct = convertible > 0 ? Math.round((ok / convertible) * 100) : 0;
         document.getElementById("progFill").style.width = pct + "%";
         document.getElementById("progPct").textContent = pct + "%";
         document.getElementById("progLbl").textContent =
-          `${ok.toLocaleString("id-ID")} dari ${total.toLocaleString("id-ID")} baris berhasil`;
+          `${ok.toLocaleString("id-ID")} dari ${convertible.toLocaleString("id-ID")} baris dapat dikonversi berhasil`;
         document.getElementById("tab-unknown").textContent =
           `⚠ Perlu Cek${noRule + unkU > 0 ? ` (${noRule + unkU})` : ""}`;
 
@@ -2008,7 +2056,13 @@
               ? "OK"
               : r._status === "no-rule"
                 ? "Tidak ada aturan"
-                : "Satuan tidak dikenal";
+                : r._status === "unknown-unit"
+                  ? "Satuan tidak dikenal"
+                  : r._status === "empty-qty"
+                    ? "QTY kosong"
+                    : r._status === "bad-row"
+                      ? "Baris rusak (dibuang)"
+                      : "-";
           obj["Aturan Digunakan"] = r._rule || "";
           obj["Keterangan"] = r._detail || "";
           return obj;
@@ -2277,6 +2331,10 @@
           return `<span class="badge bg-orange">⚠ Tdk ada aturan</span>`;
         if (s === "unknown-unit")
           return `<span class="badge bg-red">✕ Satuan tdk dikenal</span>`;
+        if (s === "empty-qty")
+          return `<span class="badge bg-gray">○ QTY kosong</span>`;
+        if (s === "bad-row")
+          return `<span class="badge bg-gray">🗑 Baris rusak</span>`;
         return `<span class="badge bg-gray">—</span>`;
       }
       function fmt(v, d = 2) {
