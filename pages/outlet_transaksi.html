@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Outlet Transaksi — RO 30/60/90 Hari</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+    />
+    <link rel="stylesheet" href="/assets/css/style_outlet_transaksi.css" />
+    <style>
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="app-header">
+        <h1>
+          <i class="ti ti-calendar-stats" aria-hidden="true"
+             style="font-size:20px;vertical-align:-2px;margin-right:6px"></i
+          >Outlet Transaksi — RO 30/60/90 Hari
+        </h1>
+        <p>
+          Upload file sumber (ALL DB COLLECT) &amp; file RO target, pilih bulan,
+          samakan nama distributor, lalu isi otomatis kolom 30/60/90 hari.
+        </p>
+      </div>
+
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step active" id="ot-step-1">
+          <div class="step-num">1</div><span>Upload &amp; Bulan</span>
+        </div>
+        <div class="step" id="ot-step-2">
+          <div class="step-num">2</div><span>Mapping Nama</span>
+        </div>
+        <div class="step" id="ot-step-3">
+          <div class="step-num">3</div><span>Hasil &amp; Export</span>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 1 ===================== -->
+      <section id="ot-panel-1" class="panel">
+        <div class="card">
+          <div class="card-h"><i class="ti ti-upload"></i> 1. File Sumber (ALL DB COLLECT)</div>
+          <div class="card-b">
+            <div class="drop" id="ot-drop-src">
+              <input type="file" id="ot-file-src" accept=".xlsx,.xls" hidden />
+              <i class="ti ti-file-spreadsheet drop-ic"></i>
+              <div class="drop-t">Klik / seret file <b>ALL DB COLLECT</b> ke sini</div>
+              <div class="drop-s">Butuh kolom: NAMA DISTRIBUTOR, NAMA CUSTOMER, BULAN, DPP</div>
+              <div class="file-chip" id="ot-chip-src" hidden></div>
+            </div>
+            <div class="fg" id="ot-src-sheet-wrap" hidden>
+              <label class="lbl">Sheet data detail</label>
+              <select id="ot-src-sheet"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><i class="ti ti-target"></i> 2. File RO Target</div>
+          <div class="card-b">
+            <div class="drop" id="ot-drop-tgt">
+              <input type="file" id="ot-file-tgt" accept=".xlsx,.xls" hidden />
+              <i class="ti ti-table drop-ic"></i>
+              <div class="drop-t">Klik / seret file <b>RO target</b> ke sini</div>
+              <div class="drop-s">File yang punya kolom NAMA DISTRIBUTOR, RO, 30/60/90 hari</div>
+              <div class="file-chip" id="ot-chip-tgt" hidden></div>
+            </div>
+            <div class="fg" id="ot-tgt-sheet-wrap" hidden>
+              <label class="lbl">Sheet RO</label>
+              <select id="ot-tgt-sheet"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><i class="ti ti-calendar"></i> 3. Bulan Target (RO)</div>
+          <div class="card-b">
+            <div class="fg">
+              <label class="lbl">Pilih bulan — sistem ambil bulan itu &amp; 2 bulan sebelumnya</label>
+              <select id="ot-month"></select>
+              <div class="hint" id="ot-month-hint"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-accent" id="ot-btn-next1" disabled>
+            Lanjut ke Mapping <i class="ti ti-arrow-right"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- ===================== STEP 2 ===================== -->
+      <section id="ot-panel-2" class="panel" hidden>
+        <div class="alert al-info">
+          <i class="ti ti-info-circle"></i>
+          Cocokkan nama distributor di <b>file RO</b> (kiri) dengan nama di <b>file sumber</b> (kanan).
+          Nama yang mirip sudah dipilih otomatis — cukup perbaiki yang salah.
+          Beberapa nama sumber boleh diarahkan ke satu target (mis. beda ejaan digabung).
+        </div>
+
+        <div class="card">
+          <div class="card-h">
+            <i class="ti ti-arrows-left-right"></i> Mapping Distributor
+            <span class="badge" id="ot-map-count"></span>
+          </div>
+          <div class="card-b">
+            <div class="map-tools">
+              <input type="text" id="ot-map-search" class="inp" placeholder="Cari nama..." />
+              <label class="chk">
+                <input type="checkbox" id="ot-map-onlyunset" /> Tampilkan yang belum cocok saja
+              </label>
+            </div>
+            <div id="ot-map-list" class="map-list"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-ghost" id="ot-btn-back2"><i class="ti ti-arrow-left"></i> Kembali</button>
+          <button class="btn-accent" id="ot-btn-calc">
+            Hitung &amp; Isi <i class="ti ti-calculator"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- ===================== STEP 3 ===================== -->
+      <section id="ot-panel-3" class="panel" hidden>
+        <div class="sumrow">
+          <div class="sumcard"><div class="sc-n" id="ot-sum-ro">0</div><div class="sc-l">Total RO (hitung)</div></div>
+          <div class="sumcard"><div class="sc-n" id="ot-sum-30">0</div><div class="sc-l">30 hari</div></div>
+          <div class="sumcard"><div class="sc-n" id="ot-sum-60">0</div><div class="sc-l">60 hari</div></div>
+          <div class="sumcard"><div class="sc-n" id="ot-sum-90">0</div><div class="sc-l">90 hari</div></div>
+        </div>
+
+        <div class="alert al-warn" id="ot-diff-box" hidden>
+          <i class="ti ti-alert-triangle"></i>
+          <div id="ot-diff-text"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><i class="ti ti-list-check"></i> Rincian per Distributor</div>
+          <div class="card-b" style="padding:0">
+            <div class="tbl-wrap">
+              <table class="tbl" id="ot-result-tbl">
+                <thead>
+                  <tr>
+                    <th>Distributor (RO)</th>
+                    <th>Sumber</th>
+                    <th class="r">RO file</th>
+                    <th class="r">RO hitung</th>
+                    <th class="r">30h</th>
+                    <th class="r">60h</th>
+                    <th class="r">90h</th>
+                    <th class="r">Selisih</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-ghost" id="ot-btn-back3"><i class="ti ti-arrow-left"></i> Ubah Mapping</button>
+          <button class="btn-accent" id="ot-btn-export">
+            <i class="ti ti-download"></i> Download File RO Terisi
+          </button>
+        </div>
+      </section>
+
+      <div class="toast-wrap" id="ot-toast"></div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+        // -------- state --------
+        var S = {
+          srcWB: null, srcRows: null, srcSheet: null,
+          tgtWB: null, tgtSheet: null, tgtInfo: null,
+          months: ["Januari","Februari","Maret","April","Mei","Juni",
+                   "Juli","Agustus","September","Oktober","November","Desember"],
+          monthsInData: [],
+          targetMonth: null, window3: [],
+          srcDistros: [],        // distinct names in source
+          tgtDistros: [],        // {row, name}
+          mapping: {},           // tgtName -> srcName ("" = none)
+          computed: null
+        };
+
+        function $(id){ return document.getElementById(id); }
+        function toast(msg, type){
+          var w=$("ot-toast"); var d=document.createElement("div");
+          d.className="toast "+(type||"info"); d.textContent=msg;
+          w.appendChild(d); setTimeout(function(){d.classList.add("show");},10);
+          setTimeout(function(){d.classList.remove("show"); setTimeout(function(){d.remove();},300);},3200);
+        }
+        function norm(s){ return (s==null?"":String(s)).trim().toLowerCase().replace(/\s+/g," "); }
+
+        // ---------- file readers ----------
+        function readFile(file, cb){
+          var r=new FileReader();
+          r.onload=function(e){
+            try{ cb(XLSX.read(new Uint8Array(e.target.result),{type:"array"})); }
+            catch(err){ toast("Gagal baca file: "+err.message,"err"); }
+          };
+          r.readAsArrayBuffer(file);
+        }
+
+        function wireDrop(dropId, inputId, onFile){
+          var drop=$(dropId), input=$(inputId);
+          drop.addEventListener("click", function(e){ if(e.target.tagName!=="SELECT") input.click(); });
+          drop.addEventListener("dragover", function(e){ e.preventDefault(); drop.classList.add("over"); });
+          drop.addEventListener("dragleave", function(){ drop.classList.remove("over"); });
+          drop.addEventListener("drop", function(e){
+            e.preventDefault(); drop.classList.remove("over");
+            if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+          });
+          input.addEventListener("change", function(){ if(input.files[0]) onFile(input.files[0]); });
+        }
+
+        // ---------- SOURCE ----------
+        wireDrop("ot-drop-src","ot-file-src", function(file){
+          $("ot-chip-src").hidden=false;
+          $("ot-chip-src").innerHTML='<i class="ti ti-file-check"></i> '+file.name;
+          readFile(file, function(wb){
+            S.srcWB=wb;
+            var sel=$("ot-src-sheet"); sel.innerHTML="";
+            wb.SheetNames.forEach(function(n){
+              var o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o);
+            });
+            // prefer a sheet whose name looks like detail/data
+            var pref=wb.SheetNames.find(function(n){ return /detail|final|data/i.test(n); });
+            sel.value=pref||wb.SheetNames[0];
+            $("ot-src-sheet-wrap").hidden=false;
+            loadSource(sel.value);
+          });
+        });
+        $("ot-src-sheet").addEventListener("change", function(){ loadSource(this.value); });
+
+        function findCol(headers, cands){
+          for(var i=0;i<headers.length;i++){
+            var h=norm(headers[i]);
+            for(var j=0;j<cands.length;j++){ if(h.indexOf(cands[j])>=0) return i; }
+          }
+          return -1;
+        }
+
+        function loadSource(sheetName){
+          S.srcSheet=sheetName;
+          var ws=S.srcWB.Sheets[sheetName];
+          var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+          if(!rows.length){ toast("Sheet kosong","err"); return; }
+          var head=rows[0];
+          var cD=findCol(head,["nama distributor","distributor"]);
+          var cC=findCol(head,["nama customer","customer","outlet","nama toko"]);
+          var cB=findCol(head,["bulan","month"]);
+          var cV=findCol(head,["dpp","nilai","value","omset"]);
+          if(cD<0||cC<0||cB<0||cV<0){
+            toast("Kolom sumber tidak lengkap (butuh Distributor, Customer, Bulan, DPP)","err");
+            return;
+          }
+          var parsed=[]; var monthsSet={}; var distSet={};
+          for(var i=1;i<rows.length;i++){
+            var r=rows[i]; if(!r) continue;
+            var d=r[cD], c=r[cC], b=r[cB], v=r[cV];
+            if(d==null||c==null||b==null) continue;
+            var bm=String(b).trim();
+            // normalize month capitalization to match list
+            var mm=S.months.find(function(x){ return norm(x)===norm(bm); });
+            if(mm){ bm=mm; monthsSet[bm]=1; }
+            parsed.push({d:d,c:c,b:bm,v:v});
+            distSet[d]=1;
+          }
+          S.srcRows=parsed;
+          S.srcDistros=Object.keys(distSet).sort();
+          S.monthsInData=S.months.filter(function(m){ return monthsSet[m]; });
+          fillMonthDropdown();
+          maybeEnableNext();
+          toast("Sumber dimuat: "+parsed.length.toLocaleString("id")+" baris","ok");
+        }
+
+        function fillMonthDropdown(){
+          var sel=$("ot-month"); sel.innerHTML="";
+          S.monthsInData.forEach(function(m){
+            var o=document.createElement("option"); o.value=m; o.textContent=m; sel.appendChild(o);
+          });
+          if(S.monthsInData.length){
+            sel.value=S.monthsInData[S.monthsInData.length-1];
+            updateMonthHint();
+          }
+          sel.onchange=updateMonthHint;
+        }
+        function updateMonthHint(){
+          var m=$("ot-month").value; S.targetMonth=m;
+          var idx=S.months.indexOf(m);
+          var w=[S.months[idx-2],S.months[idx-1],S.months[idx]].filter(Boolean);
+          S.window3=w;
+          $("ot-month-hint").textContent="Periode 3 bulan: "+w.join(" • ");
+        }
+
+        // ---------- TARGET ----------
+        wireDrop("ot-drop-tgt","ot-file-tgt", function(file){
+          $("ot-chip-tgt").hidden=false;
+          $("ot-chip-tgt").innerHTML='<i class="ti ti-file-check"></i> '+file.name;
+          S._tgtFileName=file.name;
+          readFile(file, function(wb){
+            S.tgtWB=wb;
+            var sel=$("ot-tgt-sheet"); sel.innerHTML="";
+            wb.SheetNames.forEach(function(n){
+              var o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o);
+            });
+            var pref=wb.SheetNames.find(function(n){ return /ro/i.test(n); });
+            sel.value=pref||wb.SheetNames[0];
+            $("ot-tgt-sheet-wrap").hidden=false;
+            loadTarget(sel.value);
+          });
+        });
+        $("ot-tgt-sheet").addEventListener("change", function(){ loadTarget(this.value); });
+
+        function loadTarget(sheetName){
+          S.tgtSheet=sheetName;
+          var ws=S.tgtWB.Sheets[sheetName];
+          var grid=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,blankrows:true});
+          // locate header row: the row containing "NAMA DISTRIBUTOR"
+          var hdrRow=-1, cName=-1;
+          for(var i=0;i<Math.min(grid.length,15);i++){
+            for(var j=0;j<(grid[i]||[]).length;j++){
+              if(norm(grid[i][j]).indexOf("nama distributor")>=0){ hdrRow=i; cName=j; break; }
+            }
+            if(hdrRow>=0) break;
+          }
+          if(hdrRow<0){ toast("Tidak menemukan kolom NAMA DISTRIBUTOR di file RO","err"); return; }
+
+          // find RO / 30 / 60 / 90 columns by scanning hdrRow and the row below (2-row header)
+          function scanFor(cands){
+            for(var rr=hdrRow; rr<=hdrRow+1 && rr<grid.length; rr++){
+              var row=grid[rr]||[];
+              for(var c=0;c<row.length;c++){
+                var t=norm(row[c]);
+                for(var k=0;k<cands.length;k++){ if(t===cands[k]||t.indexOf(cands[k])>=0) return c; }
+              }
+            }
+            return -1;
+          }
+          var cRO=scanFor(["ro"]);
+          var c30=scanFor(["30 hari","30hari","30"]);
+          var c60=scanFor(["60 hari","60hari","60"]);
+          var c90=scanFor(["90 hari","90hari","90"]);
+
+          // collect distributor rows: non-empty name that isn't a TOTAL/region header
+          var distros=[];
+          for(var r=hdrRow+1;r<grid.length;r++){
+            var nm=grid[r] ? grid[r][cName] : null;
+            if(nm==null||String(nm).trim()==="") continue;
+            var low=norm(nm);
+            if(low.indexOf("total")>=0) continue;
+            distros.push({row:r, name:String(nm).trim()});
+          }
+          S.tgtInfo={hdrRow:hdrRow,cName:cName,cRO:cRO,c30:c30,c60:c60,c90:c90,grid:grid};
+          S.tgtDistros=distros;
+          maybeEnableNext();
+          toast("File RO dimuat: "+distros.length+" distributor","ok");
+        }
+
+        function maybeEnableNext(){
+          $("ot-btn-next1").disabled=!(S.srcRows && S.tgtDistros.length && S.monthsInData.length);
+        }
+
+        // ---------- auto-map (token similarity) ----------
+        function tokens(s){ return norm(s).replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(function(t){ return t.length>1; }); }
+        function score(a,b){
+          var ta=tokens(a), tb=tokens(b); if(!ta.length||!tb.length) return 0;
+          var setB={}; tb.forEach(function(t){ setB[t]=1; });
+          var hit=0; ta.forEach(function(t){ if(setB[t]) hit++; });
+          return hit/Math.max(ta.length,tb.length);
+        }
+        function autoMap(){
+          S.mapping={};
+          S.tgtDistros.forEach(function(t){
+            var best="", bs=0;
+            S.srcDistros.forEach(function(s){
+              var sc=score(t.name,s);
+              if(sc>bs){ bs=sc; best=s; }
+            });
+            S.mapping[t.name]= bs>=0.34 ? best : "";
+          });
+        }
+
+        // ---------- STEP nav ----------
+        function goStep(n){
+          [1,2,3].forEach(function(i){
+            $("ot-panel-"+i).hidden = (i!==n);
+            var st=$("ot-step-"+i);
+            st.classList.toggle("active", i===n);
+            st.classList.toggle("done", i<n);
+          });
+          window.scrollTo({top:0,behavior:"smooth"});
+        }
+
+        $("ot-btn-next1").addEventListener("click", function(){
+          updateMonthHint();
+          autoMap();
+          renderMap();
+          goStep(2);
+        });
+        $("ot-btn-back2").addEventListener("click", function(){ goStep(1); });
+        $("ot-btn-back3").addEventListener("click", function(){ goStep(2); });
+
+        // ---------- render mapping ----------
+        function renderMap(){
+          var list=$("ot-map-list"); list.innerHTML="";
+          var q=norm($("ot-map-search").value);
+          var onlyUnset=$("ot-map-onlyunset").checked;
+          var shown=0, unset=0;
+          S.tgtDistros.forEach(function(t){
+            if(S.mapping[t.name]==="") unset++;
+          });
+          S.tgtDistros.forEach(function(t){
+            if(q && norm(t.name).indexOf(q)<0) return;
+            if(onlyUnset && S.mapping[t.name]!=="") return;
+            shown++;
+            var row=document.createElement("div"); row.className="map-row";
+            var isSet=S.mapping[t.name]!=="";
+            row.innerHTML=
+              '<div class="mr-tgt"><span class="dot '+(isSet?"ok":"no")+'"></span>'+t.name+'</div>'+
+              '<i class="ti ti-arrow-right mr-arr"></i>';
+            var sel=document.createElement("select"); sel.className="mr-sel";
+            var optNone=document.createElement("option"); optNone.value=""; optNone.textContent="— tidak ada —";
+            sel.appendChild(optNone);
+            S.srcDistros.forEach(function(s){
+              var o=document.createElement("option"); o.value=s; o.textContent=s;
+              if(S.mapping[t.name]===s) o.selected=true;
+              sel.appendChild(o);
+            });
+            sel.addEventListener("change", function(){
+              S.mapping[t.name]=sel.value; renderMap();
+            });
+            row.appendChild(sel);
+            list.appendChild(row);
+          });
+          $("ot-map-count").textContent=(S.tgtDistros.length-unset)+"/"+S.tgtDistros.length+" cocok";
+          if(shown===0){ list.innerHTML='<div class="empty">Tidak ada baris.</div>'; }
+        }
+        $("ot-map-search").addEventListener("input", renderMap);
+        $("ot-map-onlyunset").addEventListener("change", renderMap);
+
+        // ---------- compute ----------
+        $("ot-btn-calc").addEventListener("click", function(){
+          var W=S.window3; // e.g. [April,Mei,Juni]
+          if(W.length<1){ toast("Periode tidak valid","err"); return; }
+          // build: srcName -> customer -> set(months in window)
+          var bag={};
+          S.srcRows.forEach(function(r){
+            if(W.indexOf(r.b)<0) return;
+            if(r.v==null||r.v==="") return;   // must have DPP to count as transaksi
+            (bag[r.d]=bag[r.d]||{});
+            (bag[r.d][r.c]=bag[r.d][r.c]||{});
+            bag[r.d][r.c][r.b]=1;
+          });
+
+          var rows=[]; var t30=0,t60=0,t90=0,tRO=0;
+          S.tgtDistros.forEach(function(t){
+            var src=S.mapping[t.name];
+            var c3=0,c2=0,c1=0;
+            if(src && bag[src]){
+              var custs=bag[src];
+              Object.keys(custs).forEach(function(c){
+                var n=Object.keys(custs[c]).length;
+                if(n>=3) c3++; else if(n===2) c2++; else if(n===1) c1++;
+              });
+            }
+            var roHit=c3+c2+c1;
+            var roFile=null;
+            if(S.tgtInfo.cRO>=0 && S.tgtInfo.grid[t.row]){
+              var v=S.tgtInfo.grid[t.row][S.tgtInfo.cRO];
+              if(typeof v==="number") roFile=v;
+              else if(v!=null && !isNaN(parseFloat(v))) roFile=parseFloat(v);
+            }
+            rows.push({name:t.name,src:src,row:t.row,roFile:roFile,roHit:roHit,c30:c3,c60:c2,c90:c1});
+            t30+=c3; t60+=c2; t90+=c1; tRO+=roHit;
+          });
+          S.computed={rows:rows,t30:t30,t60:t60,t90:t90,tRO:tRO};
+          renderResults();
+          goStep(3);
+        });
+
+        function renderResults(){
+          var C=S.computed;
+          $("ot-sum-ro").textContent=C.tRO.toLocaleString("id");
+          $("ot-sum-30").textContent=C.t30.toLocaleString("id");
+          $("ot-sum-60").textContent=C.t60.toLocaleString("id");
+          $("ot-sum-90").textContent=C.t90.toLocaleString("id");
+
+          var tb=$("ot-result-tbl").querySelector("tbody"); tb.innerHTML="";
+          var diffs=[];
+          C.rows.forEach(function(r){
+            var diff = (r.roFile==null)?null:(r.roFile - r.roHit);
+            var cls = (diff===null)?"":(diff===0?"d-ok":"d-bad");
+            if(diff!==null && diff!==0) diffs.push(r);
+            var tr=document.createElement("tr");
+            tr.innerHTML=
+              "<td>"+r.name+"</td>"+
+              "<td class='src'>"+(r.src||"<span class='no-src'>—</span>")+"</td>"+
+              "<td class='r'>"+(r.roFile==null?"—":r.roFile.toLocaleString("id"))+"</td>"+
+              "<td class='r'>"+r.roHit.toLocaleString("id")+"</td>"+
+              "<td class='r'>"+r.c30+"</td>"+
+              "<td class='r'>"+r.c60+"</td>"+
+              "<td class='r'>"+r.c90+"</td>"+
+              "<td class='r "+cls+"'>"+(diff===null?"—":(diff>0?"+"+diff:diff))+"</td>";
+            tb.appendChild(tr);
+          });
+
+          if(diffs.length){
+            $("ot-diff-box").hidden=false;
+            var txt="Ada "+diffs.length+" distributor dengan selisih antara RO file dan RO hasil hitung: ";
+            txt+=diffs.map(function(r){ return r.name+" ("+(r.roFile-r.roHit>0?"+":"")+(r.roFile-r.roHit)+")"; }).join(", ")+". ";
+            txt+="Angka yang diisi ke file adalah hasil hitung dari data sumber. Selisih biasanya karena beda ejaan nama, nama belum dipetakan, atau RO manual di file lama tidak akurat.";
+            $("ot-diff-text").textContent=txt;
+          } else {
+            $("ot-diff-box").hidden=true;
+          }
+        }
+
+        // ---------- export ----------
+        $("ot-btn-export").addEventListener("click", function(){
+          if(!S.computed){ return; }
+          var info=S.tgtInfo;
+          if(info.c30<0||info.c60<0||info.c90<0){
+            toast("Kolom 30/60/90 tidak ditemukan di file RO","err"); return;
+          }
+          var ws=S.tgtWB.Sheets[S.tgtSheet];
+          S.computed.rows.forEach(function(r){
+            setCell(ws, r.row, info.c30, r.c30);
+            setCell(ws, r.row, info.c60, r.c60);
+            setCell(ws, r.row, info.c90, r.c90);
+          });
+          var out=S._tgtFileName ? S._tgtFileName.replace(/\.xlsx?$/i,"") : "RO";
+          XLSX.writeFile(S.tgtWB, out+"_terisi.xlsx");
+          toast("File berhasil diunduh","ok");
+        });
+
+        function setCell(ws, r, c, val){
+          var addr=XLSX.utils.encode_cell({r:r,c:c});
+          ws[addr]={t:"n",v:val};
+          // extend range if needed
+          var range=XLSX.utils.decode_range(ws["!ref"]);
+          if(r>range.e.r) range.e.r=r;
+          if(c>range.e.c) range.e.c=c;
+          ws["!ref"]=XLSX.utils.encode_range(range);
+        }
+      })();
+    </script>
+  </body>
+</html>
