@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RTM Report Generator — Harum Group</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="/css/rtm_report_generator.css" />
+  </head>
+  <body>
+    <button class="sr-back" onclick="loadPage('home')">
+      <i class="ti ti-arrow-left"></i> Dashboard
+    </button>
+    <header>
+      <h1>⚙️ RTM Report Generator</h1>
+      <span class="tag">Harum Group · Monthly RTM</span>
+    </header>
+
+    <div class="wrap">
+      <div class="steps">
+        <div class="step on" id="s1">1. Upload data</div>
+        <div class="step" id="s2">2. Set periode</div>
+        <div class="step" id="s3">3. Generate</div>
+        <div class="step" id="s4">4. Download</div>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="card">
+        <h2><span class="n">1</span> Upload File Sumber</h2>
+        <p class="hint">
+          Minimal upload <b>ALL DB COLLECT</b> (wajib). Dua lainnya opsional —
+          kalau ada, laporan makin lengkap.
+        </p>
+        <div class="grid3">
+          <label class="drop" id="d1">
+            <input type="file" id="f1" accept=".xlsx,.xls" />
+            <span class="ic">📊</span>
+            <span class="t"
+              >ALL DB COLLECT <span style="color: var(--red)">*</span></span
+            >
+            <span class="s" id="n1">Transaksi outlet (AO/RO/Sell-Out)</span>
+          </label>
+          <label class="drop" id="d2">
+            <input type="file" id="f2" accept=".xlsx,.xls" />
+            <span class="ic">💰</span>
+            <span class="t">CLOSING (Penjualan)</span>
+            <span class="s" id="n2">Omset primary & segmen RTM</span>
+          </label>
+          <label class="drop" id="d3">
+            <input type="file" id="f3" accept=".xlsx,.xls" />
+            <span class="ic">📦</span>
+            <span class="t">STOK CLOSING</span>
+            <span class="s" id="n3">End stock per distributor</span>
+          </label>
+        </div>
+        <div class="msg" id="m1"></div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="card">
+        <h2><span class="n">2</span> Periode & Target</h2>
+        <p class="hint">
+          Tentukan bulan laporan dan target. Universe & target dipakai untuk
+          hitung % achievement.
+        </p>
+        <div class="row">
+          <div class="fld">
+            <label>Bulan</label>
+            <select id="bulan">
+              <option>Januari</option>
+              <option>Februari</option>
+              <option>Maret</option>
+              <option>April</option>
+              <option>Mei</option>
+              <option selected>Juni</option>
+              <option>Juli</option>
+              <option>Agustus</option>
+              <option>September</option>
+              <option>Oktober</option>
+              <option>November</option>
+              <option>Desember</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label>Tahun</label><input type="number" id="tahun" value="2026" />
+          </div>
+          <div class="fld">
+            <label>Universe Outlet</label
+            ><input type="number" id="universe" value="25812" />
+          </div>
+          <div class="fld">
+            <label>Target AO</label
+            ><input type="number" id="targetAO" value="5950" />
+          </div>
+          <div class="fld">
+            <label>Target RO</label
+            ><input type="number" id="targetRO" value="7708" />
+          </div>
+        </div>
+        <div class="row" style="margin-top: 10px">
+          <div class="fld">
+            <label>Metode hitung AO nasional</label>
+            <select id="metodeAO">
+              <option value="sum">
+                Jumlah per distributor (seperti file Anda) — 5.161
+              </option>
+              <option value="uniq">
+                Outlet unik nasional (tanpa duplikat) — 5.089
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="card">
+        <h2><span class="n">3</span> Generate Laporan</h2>
+        <p class="hint">
+          Tool akan mengonversi satuan ke dus, menghitung AO/RO, segmentasi,
+          scorecard, priority SKU, dan produktivitas salesman.
+        </p>
+        <button id="btnGen" disabled>▶ Generate Laporan Bulanan</button>
+        <button class="sec" id="btnReset">Reset</button>
+        <div class="msg" id="m2"></div>
+      </div>
+
+      <!-- HASIL -->
+      <div class="card hide" id="hasil">
+        <h2><span class="n">4</span> Hasil & Download</h2>
+        <div class="stats" id="statBox"></div>
+        <div class="row" style="margin-bottom: 12px">
+          <button class="g" id="btnDl">⬇ Download Excel Laporan</button>
+          <button class="sec" id="btnDlPpt">⬇ Download Data PPT (CSV)</button>
+        </div>
+        <div class="tabs" id="tabs"></div>
+        <div class="tbox"><table id="tbl"></table></div>
+        <div class="msg" id="m3"></div>
+      </div>
+
+      <div class="foot">
+        RTM Report Generator · dibuat untuk alur pelaporan bulanan Harum Group
+      </div>
+    </div>
+
+    <script>
+      // ============ ATURAN KONVERSI (hasil rekonsiliasi) ============
+      const RULES = [
+        { key: ["6x24", "6 x 24"], pcs: 144, rtg: 6 },
+        { key: ["6x15"], pcs: 90, rtg: 6 },
+        { key: ["isi 80", "isi80"], pcs: 80, rtg: 8 },
+        { key: ["isi 40", "isi40"], pcs: 40, rtg: 4 },
+      ];
+      function findRule(nama) {
+        const n = String(nama || "").toLowerCase();
+        for (const r of RULES) {
+          if (r.key.some((k) => n.includes(k))) return r;
+        }
+        return null;
+      }
+      // BOX = 1 Dus ; PAK = renceng ; DUS = 1:1 ; PCS/RTG per aturan
+      function toDus(qty, sat, nama) {
+        const namaC = String(nama || "").trim();
+        if (namaC === "" || namaC === "0")
+          return { dus: null, st: "BARIS RUSAK" };
+        if (qty === null || qty === undefined || qty === "")
+          return { dus: null, st: "QTY KOSONG" };
+        const s = String(sat || "")
+          .trim()
+          .toUpperCase();
+        const q = parseFloat(String(qty).replace(/[^0-9.\-]/g, ""));
+        if (isNaN(q)) return { dus: null, st: "QTY KOSONG" };
+        if (s === "DUS") return { dus: q, st: "OK" };
+        if (s === "BOX") return { dus: q, st: "OK" };
+        const r = findRule(namaC);
+        if (!r) return { dus: null, st: "TIDAK ADA ATURAN" };
+        if (s === "PCS") return { dus: q / r.pcs, st: "OK" };
+        if (["RTG", "RENCENG", "PAK", "DSK", "KARTON", "DUPLEX"].includes(s))
+          return { dus: q / r.rtg, st: "OK" };
+        return { dus: null, st: "SATUAN TIDAK DIKENAL: " + s };
+      }
+
+      // ============ STATE ============
+      const FILES = { db: null, closing: null, stok: null };
+      let RESULT = null,
+        ACTIVE_TAB = null;
+
+      const $ = (id) => document.getElementById(id);
+      function msg(el, txt, type = "ok") {
+        const m = $(el);
+        m.className = "msg show " + type;
+        m.innerHTML = txt;
+      }
+      function hideMsg(el) {
+        $(el).className = "msg";
+      }
+      function fmt(n, d = 0) {
+        return n === null || n === undefined || isNaN(n)
+          ? "-"
+          : Number(n).toLocaleString("id-ID", {
+              minimumFractionDigits: d,
+              maximumFractionDigits: d,
+            });
+      }
+      function rp(n) {
+        if (n >= 1e9) return "Rp " + (n / 1e9).toFixed(2) + " M";
+        if (n >= 1e6) return "Rp " + (n / 1e6).toFixed(0) + " jt";
+        return "Rp " + fmt(n);
+      }
+
+      // ============ UPLOAD ============
+      [
+        ["f1", "d1", "n1", "db"],
+        ["f2", "d2", "n2", "closing"],
+        ["f3", "d3", "n3", "stok"],
+      ].forEach(([fi, di, ni, key]) => {
+        $(fi).addEventListener("change", (e) => {
+          const f = e.target.files[0];
+          if (!f) return;
+          const rd = new FileReader();
+          rd.onload = (ev) => {
+            try {
+              const wb = XLSX.read(new Uint8Array(ev.target.result), {
+                type: "array",
+              });
+              FILES[key] = { name: f.name, wb };
+              $(di).classList.add("ok");
+              $(ni).textContent = "✓ " + f.name.slice(0, 32);
+              checkReady();
+            } catch (err) {
+              msg("m1", "Gagal membaca file: " + err.message, "err");
+            }
+          };
+          rd.readAsArrayBuffer(f);
+        });
+      });
+      function checkReady() {
+        const ok = !!FILES.db;
+        $("btnGen").disabled = !ok;
+        $("s1").className = "step " + (ok ? "done" : "on");
+        if (ok) {
+          $("s2").className = "step done";
+          $("s3").className = "step on";
+          msg(
+            "m1",
+            "File siap. ALL DB COLLECT terbaca" +
+              (FILES.closing ? ", CLOSING terbaca" : "") +
+              (FILES.stok ? ", STOK terbaca" : "") +
+              ".",
+            "ok",
+          );
+        }
+      }
+
+      // ============ HELPER BACA SHEET ============
+      function pickSheet(wb, cands) {
+        for (const c of cands) {
+          const hit = wb.SheetNames.find((n) => n.toLowerCase().includes(c));
+          if (hit) return hit;
+        }
+        return wb.SheetNames[0];
+      }
+      function rows(wb, sheet) {
+        return XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: null });
+      }
+      function findCol(obj, cands) {
+        const keys = Object.keys(obj || {});
+        for (const c of cands) {
+          const hit = keys.find((k) =>
+            String(k).toLowerCase().replace(/\s+/g, "").includes(c),
+          );
+          if (hit) return hit;
+        }
+        return null;
+      }
+
+      // ============ GENERATE ============
+      $("btnGen").addEventListener("click", () => {
+        try {
+          hideMsg("m2");
+          const bulan = $("bulan").value,
+            tahun = $("tahun").value;
+          const universe = +$("universe").value,
+            tgtAO = +$("targetAO").value,
+            tgtRO = +$("targetRO").value;
+          const metode = $("metodeAO").value;
+
+          // ---- 1. ALL DB COLLECT ----
+          const sh = pickSheet(FILES.db.wb, ["data detail", "data", "sheet1"]);
+          let data = rows(FILES.db.wb, sh);
+          if (!data.length) throw new Error("Sheet data kosong");
+          const c0 = data[0];
+          const cDist = findCol(c0, ["namadistributor", "distributor"]);
+          const cSls = findCol(c0, ["namasalesman", "salesman", "sales"]);
+          const cCust = findCol(c0, [
+            "namacustomer",
+            "customer",
+            "outlet",
+            "pelanggan",
+          ]);
+          const cBln = findCol(c0, ["bulan", "periode", "month"]);
+          const cBrg = findCol(c0, ["namabarang", "barang", "item", "produk"]);
+          const cQty = findCol(c0, ["qty", "kuantitas", "jumlah"]);
+          const cSat = findCol(c0, ["sat", "satuan", "uom"]);
+          if (!cDist || !cCust || !cQty)
+            throw new Error(
+              "Kolom wajib tidak ditemukan (Distributor / Customer / QTY). Cek header file.",
+            );
+
+          // filter bulan bila kolom bulan ada
+          if (cBln) {
+            const bl = bulan.toLowerCase();
+            const f = data.filter(
+              (r) =>
+                String(r[cBln] || "")
+                  .toLowerCase()
+                  .trim() === bl,
+            );
+            if (f.length) data = f;
+          }
+
+          // konversi dus
+          let konvOK = 0,
+            konvBad = 0;
+          const badList = {};
+          data.forEach((r) => {
+            const { dus, st } = toDus(
+              r[cQty],
+              cSat ? r[cSat] : "DUS",
+              cBrg ? r[cBrg] : "x",
+            );
+            r.__dus = dus;
+            r.__st = st;
+            if (st === "OK") konvOK++;
+            else {
+              konvBad++;
+              badList[st] = (badList[st] || 0) + 1;
+            }
+          });
+
+          // AO/RO & sell-out per distributor
+          const perDist = {};
+          data.forEach((r) => {
+            const d = String(r[cDist] || "-").trim();
+            if (!perDist[d])
+              perDist[d] = { dist: d, outs: new Set(), dus: 0, sls: new Set() };
+            perDist[d].outs.add(String(r[cCust] || "").trim());
+            perDist[d].dus += r.__dus || 0;
+            if (cSls) perDist[d].sls.add(String(r[cSls] || "").trim());
+          });
+          const distArr = Object.values(perDist)
+            .map((o) => ({
+              Distributor: o.dist,
+              "Active Outlet": o.outs.size,
+              "Sell-Out (Qty Dus)": Math.round(o.dus * 10) / 10,
+              "Jml Salesman": o.sls.size,
+            }))
+            .sort((a, b) => b["Sell-Out (Qty Dus)"] - a["Sell-Out (Qty Dus)"]);
+
+          const aoUniq = new Set(data.map((r) => String(r[cCust] || "").trim()))
+            .size;
+          const aoSum = distArr.reduce((s, o) => s + o["Active Outlet"], 0);
+          const AO = metode === "uniq" ? aoUniq : aoSum;
+          const totalDus = distArr.reduce(
+            (s, o) => s + o["Sell-Out (Qty Dus)"],
+            0,
+          );
+
+          // produktivitas salesman
+          let smArr = [];
+          if (cSls) {
+            const perSls = {};
+            data.forEach((r) => {
+              const s = String(r[cSls] || "-").trim();
+              if (!perSls[s])
+                perSls[s] = {
+                  sls: s,
+                  dist: String(r[cDist] || ""),
+                  outs: new Set(),
+                  dus: 0,
+                };
+              perSls[s].outs.add(String(r[cCust] || "").trim());
+              perSls[s].dus += r.__dus || 0;
+            });
+            smArr = Object.values(perSls)
+              .map((o) => ({
+                Salesman: o.sls,
+                Distributor: o.dist,
+                "Active Outlet": o.outs.size,
+                "Sell-Out (Dus)": Math.round(o.dus * 10) / 10,
+              }))
+              .sort((a, b) => b["Sell-Out (Dus)"] - a["Sell-Out (Dus)"]);
+          }
+
+          // ---- 2. CLOSING (opsional) ----
+          let segArr = [],
+            skuArr = [],
+            omsetArr = [],
+            totalOmset = 0,
+            nPelanggan = 0;
+          if (FILES.closing) {
+            const shc = pickSheet(FILES.closing.wb, [
+              "rincian",
+              "penjualan",
+              "data",
+              "sheet1",
+            ]);
+            const cd = rows(FILES.closing.wb, shc);
+            if (cd.length) {
+              const k = cd[0];
+              const kJml = findCol(k, ["jumlah", "omset", "nilai", "total"]);
+              const kSeg = findCol(k, ["rtm", "segmen", "segment"]);
+              const kBrg = findCol(k, ["namabarang", "barang", "item"]);
+              const kGrp = findCol(k, ["grouping", "distributor", "group"]);
+              const kCst = findCol(k, [
+                "namapelanggan",
+                "pelanggan",
+                "customer",
+              ]);
+              if (kJml) {
+                cd.forEach((r) => {
+                  r.__j =
+                    parseFloat(String(r[kJml]).replace(/[^0-9.\-]/g, "")) || 0;
+                });
+                totalOmset = cd.reduce((s, r) => s + r.__j, 0);
+                if (kCst)
+                  nPelanggan = new Set(cd.map((r) => String(r[kCst] || "")))
+                    .size;
+                if (kSeg) {
+                  const g = {};
+                  cd.forEach((r) => {
+                    const s = String(r[kSeg] || "-").trim();
+                    g[s] = g[s] || { seg: s, om: 0, o: new Set() };
+                    g[s].om += r.__j;
+                    if (kCst) g[s].o.add(String(r[kCst] || ""));
+                  });
+                  segArr = Object.values(g)
+                    .map((o) => ({
+                      Segmen: o.seg,
+                      "Omset (Rp)": Math.round(o.om),
+                      "% Kontribusi": totalOmset
+                        ? Math.round((o.om / totalOmset) * 1000) / 10
+                        : 0,
+                      "Jml Outlet": o.o.size,
+                    }))
+                    .sort((a, b) => b["Omset (Rp)"] - a["Omset (Rp)"]);
+                }
+                if (kBrg) {
+                  const g = {};
+                  cd.forEach((r) => {
+                    const s = String(r[kBrg] || "-").trim();
+                    g[s] = (g[s] || 0) + r.__j;
+                  });
+                  let cum = 0;
+                  skuArr = Object.entries(g)
+                    .map(([n, v]) => ({ SKU: n, "Omset (Rp)": Math.round(v) }))
+                    .sort((a, b) => b["Omset (Rp)"] - a["Omset (Rp)"])
+                    .map((o, i) => {
+                      const p = totalOmset
+                        ? (o["Omset (Rp)"] / totalOmset) * 100
+                        : 0;
+                      cum += p;
+                      return {
+                        Rank: i + 1,
+                        ...o,
+                        "% Kontribusi": Math.round(p * 10) / 10,
+                        "% Kumulatif": Math.round(cum * 10) / 10,
+                        Priority: cum <= 81 ? "YA" : "",
+                      };
+                    });
+                }
+                if (kGrp) {
+                  const g = {};
+                  cd.forEach((r) => {
+                    const s = String(r[kGrp] || "-").trim();
+                    g[s] = (g[s] || 0) + r.__j;
+                  });
+                  omsetArr = Object.entries(g)
+                    .map(([n, v]) => ({
+                      Distributor: n,
+                      "Omset (Rp)": Math.round(v),
+                    }))
+                    .sort((a, b) => b["Omset (Rp)"] - a["Omset (Rp)"]);
+                }
+              }
+            }
+          }
+
+          // ---- 3. STOK (opsional, multi-sheet) ----
+          let stokArr = [],
+            totalStok = 0;
+          if (FILES.stok) {
+            FILES.stok.wb.SheetNames.forEach((sn) => {
+              const rs = rows(FILES.stok.wb, sn);
+              if (!rs.length) return;
+              const k = rs[0];
+              const kStok = Object.keys(k).find((x) =>
+                String(x).toUpperCase().includes("STOK END"),
+              );
+              const kPrc = Object.keys(k).find((x) =>
+                String(x).toUpperCase().includes("PRICE"),
+              );
+              if (!kStok || !kPrc) return;
+              let q = 0,
+                v = 0;
+              rs.forEach((r) => {
+                const a = parseFloat(r[kStok]) || 0,
+                  b = parseFloat(r[kPrc]) || 0;
+                q += a;
+                v += a * b;
+              });
+              stokArr.push({
+                Distributor: sn,
+                "End Stock (Qty)": Math.round(q),
+                "End Stock (Rp)": Math.round(v),
+              });
+            });
+            stokArr.sort((a, b) => b["End Stock (Rp)"] - a["End Stock (Rp)"]);
+            totalStok = stokArr.reduce((s, o) => s + o["End Stock (Rp)"], 0);
+          }
+
+          // ---- RINGKASAN ----
+          const pctAO = tgtAO ? (AO / tgtAO) * 100 : 0;
+          const ring = [
+            { Metrik: "Periode", Nilai: bulan + " " + tahun },
+            { Metrik: "Universe Outlet", Nilai: universe },
+            { Metrik: "Target RO", Nilai: tgtRO },
+            { Metrik: "Active Outlet (AO)", Nilai: AO },
+            { Metrik: "  — AO unik nasional", Nilai: aoUniq },
+            { Metrik: "  — AO jumlah per distributor", Nilai: aoSum },
+            {
+              Metrik: "  — selisih (outlet multi-distributor)",
+              Nilai: aoSum - aoUniq,
+            },
+            { Metrik: "Target AO", Nilai: tgtAO },
+            {
+              Metrik: "% Achievement AO",
+              Nilai: Math.round(pctAO * 10) / 10 + "%",
+            },
+            {
+              Metrik: "Total Sell-Out (Qty Dus)",
+              Nilai: Math.round(totalDus * 10) / 10,
+            },
+            { Metrik: "Jumlah Distributor", Nilai: distArr.length },
+            { Metrik: "Jumlah Salesman", Nilai: smArr.length },
+            {
+              Metrik: "Total Omset Primary (Rp)",
+              Nilai: totalOmset
+                ? Math.round(totalOmset)
+                : "(file CLOSING tidak diupload)",
+            },
+            { Metrik: "Jumlah Pelanggan Primary", Nilai: nPelanggan || "-" },
+            {
+              Metrik: "Total End Stock (Rp)",
+              Nilai: totalStok
+                ? Math.round(totalStok)
+                : "(file STOK tidak diupload)",
+            },
+            { Metrik: "Baris konversi OK", Nilai: konvOK },
+            { Metrik: "Baris perlu cek", Nilai: konvBad },
+          ];
+
+          RESULT = {
+            bulan,
+            tahun,
+            ring,
+            distArr,
+            smArr,
+            segArr,
+            skuArr,
+            omsetArr,
+            stokArr,
+            stats: {
+              AO,
+              aoUniq,
+              aoSum,
+              pctAO,
+              totalDus,
+              totalOmset,
+              totalStok,
+              konvOK,
+              konvBad,
+              badList,
+              nDist: distArr.length,
+              nSls: smArr.length,
+              universe,
+              tgtAO,
+            },
+          };
+          renderHasil();
+          $("s3").className = "step done";
+          $("s4").className = "step on";
+          msg("m2", "Laporan berhasil dibuat. Cek hasil di bawah.", "ok");
+        } catch (err) {
+          msg("m2", "Gagal generate: " + err.message, "err");
+        }
+      });
+
+      // ============ RENDER ============
+      function renderHasil() {
+        $("hasil").classList.remove("hide");
+        const s = RESULT.stats;
+        $("statBox").innerHTML = `
+   <div class="stat"><div class="v">${fmt(s.AO)}</div><div class="l">Active Outlet</div></div>
+   <div class="stat ${s.pctAO >= 100 ? "g" : s.pctAO >= 75 ? "w" : "r"}"><div class="v">${fmt(s.pctAO, 1)}%</div><div class="l">Ach vs Target</div></div>
+   <div class="stat"><div class="v">${fmt(s.totalDus, 0)}</div><div class="l">Sell-Out (Dus)</div></div>
+   <div class="stat g"><div class="v">${s.totalOmset ? rp(s.totalOmset) : "-"}</div><div class="l">Omset Primary</div></div>
+   <div class="stat g"><div class="v">${s.totalStok ? rp(s.totalStok) : "-"}</div><div class="l">End Stock</div></div>
+   <div class="stat"><div class="v">${fmt(s.nDist)} / ${fmt(s.nSls)}</div><div class="l">Distributor / Salesman</div></div>
+   <div class="stat ${s.konvBad ? "w" : "g"}"><div class="v">${fmt(s.konvOK)}</div><div class="l">Konversi OK</div></div>
+   <div class="stat ${s.konvBad ? "r" : "g"}"><div class="v">${fmt(s.konvBad)}</div><div class="l">Perlu Cek</div></div>`;
+
+        if (s.konvBad) {
+          const d = Object.entries(s.badList)
+            .map(([k, v]) => `${k}: <b>${v}</b>`)
+            .join(" · ");
+          msg(
+            "m3",
+            "Catatan konversi — " +
+              d +
+              ". Baris ini tidak dihitung ke total dus.",
+            "warn",
+          );
+        } else hideMsg("m3");
+
+        const tabs = [
+          ["ring", "Ringkasan"],
+          ["distArr", "Per Distributor"],
+          ["smArr", "Produktivitas Salesman"],
+          ["segArr", "Segmen RTM"],
+          ["skuArr", "Priority SKU"],
+          ["omsetArr", "Omset Distributor"],
+          ["stokArr", "End Stock"],
+        ];
+        $("tabs").innerHTML = tabs
+          .filter(([k]) => RESULT[k] && RESULT[k].length)
+          .map(
+            ([k, l], i) =>
+              `<div class="tab${i === 0 ? " on" : ""}" data-k="${k}">${l}</div>`,
+          )
+          .join("");
+        document.querySelectorAll(".tab").forEach((t) =>
+          t.addEventListener("click", () => {
+            document
+              .querySelectorAll(".tab")
+              .forEach((x) => x.classList.remove("on"));
+            t.classList.add("on");
+            showTable(t.dataset.k);
+          }),
+        );
+        const first = tabs.find(([k]) => RESULT[k] && RESULT[k].length);
+        if (first) showTable(first[0]);
+      }
+      function showTable(key) {
+        ACTIVE_TAB = key;
+        const arr = RESULT[key] || [];
+        if (!arr.length) {
+          $("tbl").innerHTML = "<tr><td>Tidak ada data</td></tr>";
+          return;
+        }
+        const cols = Object.keys(arr[0]);
+        let h =
+          "<thead><tr>" +
+          cols.map((c) => `<th>${c}</th>`).join("") +
+          "</tr></thead><tbody>";
+        arr.slice(0, 300).forEach((r) => {
+          h +=
+            "<tr>" +
+            cols
+              .map((c) => {
+                const v = r[c];
+                const isN = typeof v === "number";
+                return `<td class="${isN ? "num" : ""}">${isN ? fmt(v, Number.isInteger(v) ? 0 : 1) : v === null ? "-" : v}</td>`;
+              })
+              .join("") +
+            "</tr>";
+        });
+        $("tbl").innerHTML = h + "</tbody>";
+      }
+
+      // ============ DOWNLOAD ============
+      $("btnDl").addEventListener("click", () => {
+        const wb = XLSX.utils.book_new();
+        const add = (arr, nm) => {
+          if (arr && arr.length)
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(arr), nm);
+        };
+        add(RESULT.ring, "RINGKASAN");
+        add(RESULT.distArr, "Per Distributor");
+        add(RESULT.smArr, "Produktivitas Salesman");
+        add(RESULT.segArr, "Segmen RTM");
+        add(RESULT.skuArr, "Priority SKU");
+        add(RESULT.omsetArr, "Omset Distributor");
+        add(RESULT.stokArr, "End Stock");
+        XLSX.writeFile(wb, `RTM_${RESULT.bulan}${RESULT.tahun}_generated.xlsx`);
+      });
+      $("btnDlPpt").addEventListener("click", () => {
+        const s = RESULT.stats;
+        const rowsCsv = [
+          ["Slide", "Metrik", "Nilai"],
+          ["4-5", "Universe Outlet", s.universe],
+          ["4-5", "Active Outlet", s.AO],
+          ["4-5", "Target AO", s.tgtAO],
+          ["4-5", "% Ach AO", fmt(s.pctAO, 1) + "%"],
+          ["9-10", "Total Omset Primary", s.totalOmset || ""],
+          ["14-16", "Total Sell-Out (Dus)", fmt(s.totalDus, 1)],
+          ["14-16", "Jumlah Distributor", s.nDist],
+          ["16", "Total End Stock", s.totalStok || ""],
+          [
+            "19-20",
+            "Priority SKU (top10 %)",
+            RESULT.skuArr.length
+              ? RESULT.skuArr[Math.min(9, RESULT.skuArr.length - 1)][
+                  "% Kumulatif"
+                ] + "%"
+              : "",
+          ],
+          ["21", "Jumlah Salesman", s.nSls],
+        ];
+        const csv = rowsCsv
+          .map((r) => r.map((x) => `"${x}"`).join(","))
+          .join("\n");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(
+          new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
+        );
+        a.download = `PPT_DATA_${RESULT.bulan}${RESULT.tahun}.csv`;
+        a.click();
+      });
+      $("btnReset").addEventListener("click", () => location.reload());
+    </script>
+  </body>
+</html>
