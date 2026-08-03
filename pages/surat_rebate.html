@@ -23,9 +23,9 @@
         <div class="eyebrow">CV Sumber Harum Utama · Business Development</div>
         <h1>Generator Surat Rebate Distributor</h1>
         <p>
-          Ubah satu file Excel jadi ratusan surat — otomatis nomor, nama, &amp;
-          tabel, dikelompokkan per distributor. Template Word bisa kamu ganti
-          sendiri saat isi surat berubah.
+          Ubah satu file Excel jadi ratusan surat. Template Word &amp;
+          placeholder bebas kamu tentukan — tools membaca placeholder di
+          template dan kolom di Excel, lalu kamu petakan lewat dropdown.
         </p>
       </div>
 
@@ -34,7 +34,7 @@
           <span class="sr-snum">1</span><span>Unggah</span>
         </div>
         <div class="sr-step" id="sr-st2">
-          <span class="sr-snum">2</span><span>Nomor &amp; Tanggal</span>
+          <span class="sr-snum">2</span><span>Kolom &amp; Nomor</span>
         </div>
         <div class="sr-step" id="sr-st3">
           <span class="sr-snum">3</span><span>Periksa</span>
@@ -48,7 +48,7 @@
       <div class="sr-card" id="sr-c1">
         <div class="sr-card-h">
           <i class="ti ti-file-spreadsheet"></i> Unggah data &amp; template
-          <span class="badge">sheet: Rebate DB</span>
+          <span class="badge">sheet: Rebate DB / pertama</span>
         </div>
         <div class="sr-card-b">
           <div class="sr-drop" id="sr-drop">
@@ -56,8 +56,7 @@
             <div class="di"><i class="ti ti-upload"></i></div>
             <div class="dt">Klik / seret file <b>Excel data</b> ke sini</div>
             <div class="ds">
-              Kolom: NAMA DISTRIBUTOR · NAMA CUSTOMER · TARGET · REBATE MONTHLY
-              · REBATE QUARTERLY · TOTAL COST
+              Semua kolom akan dibaca otomatis untuk dipetakan ke placeholder.
             </div>
           </div>
           <div class="sr-chip" id="sr-chip">
@@ -82,13 +81,11 @@
             </div>
             <div class="sr-tpl-detect" id="sr-tpl-detect"></div>
             <div class="sr-note" style="margin-top: 0.55rem">
-              Placeholder yang didukung di template:
-              <code>${nomor_naskah}</code> <code>${nama_cust}</code>
-              <code>${tbl_nama}</code> <code>${tbl_target}</code>
-              <code>${tbl_monthly}</code> <code>${tbl_quarterly}</code>
-              <code>${tbl_total}</code> · opsional <code>${tanggal}</code>. Ubah
-              teks/isi lain sesukamu di Word — asalkan penanda ini tetap ada
-              (aman walau terpecah antar-kata saat diedit).
+              Tulis placeholder bebas di template Word dengan format
+              <code>${nama_placeholder}</code> (mis. <code>${no}</code>,
+              <code>${penerima}</code>). Tools membacanya otomatis, aman walau
+              teksnya terpecah saat diedit di Word. Pemetaan ke kolom Excel
+              diatur di langkah 2.
             </div>
           </div>
         </div>
@@ -97,9 +94,11 @@
       <!-- 2 -->
       <div class="sr-card locked" id="sr-c2">
         <div class="sr-card-h">
-          <i class="ti ti-hash"></i> Atur nomor &amp; tanggal surat
+          <i class="ti ti-arrows-left-right"></i> Atur kolom, nomor &amp;
+          tanggal
         </div>
         <div class="sr-card-b">
+          <div class="sr-map" id="sr-map"></div>
           <div class="sr-grid">
             <div class="sr-fld">
               <label class="lbl"
@@ -121,7 +120,7 @@
             <div class="sr-fld">
               <label class="lbl"
                 >Tanggal surat
-                <span class="q">— di atas tanda tangan</span></label
+                <span class="q">— untuk ${tanggal} / tgl surat</span></label
               >
               <input type="text" id="sr-tgl" placeholder="mis. 15 Juli 2026" />
             </div>
@@ -151,27 +150,19 @@
       <div class="sr-card locked" id="sr-c3">
         <div class="sr-card-h">
           <i class="ti ti-list-check"></i> Periksa &amp; sunting
-          <span class="badge">kolom "Nama pada surat" bisa diedit</span>
+          <span class="badge"
+            >sel bisa diedit · klik baris untuk pratinjau</span
+          >
         </div>
         <div class="sr-card-b">
           <div class="sr-stats" id="sr-stats"></div>
           <div class="sr-tblwrap">
             <table class="sr-tbl">
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>Nomor Surat</th>
-                  <th>Nama Customer (Excel)</th>
-                  <th>Nama pada surat</th>
-                  <th style="text-align: right">Target</th>
-                  <th style="text-align: right">Monthly</th>
-                  <th style="text-align: right">Quarterly</th>
-                  <th style="text-align: right">Total</th>
-                </tr>
-              </thead>
+              <thead id="sr-thead"></thead>
               <tbody id="sr-tbody"></tbody>
             </table>
           </div>
+
           <div class="sr-prevhead">
             <span class="sr-prevtitle"
               ><i class="ti ti-eye"></i> Pratinjau surat — cek kecocokan tiap
@@ -200,15 +191,6 @@
             </div>
             <div class="sr-stage" id="sr-stage"></div>
           </div>
-          <div class="sr-note">
-            <i class="ti ti-info-circle"></i> Transformasi nama: kode
-            <code>(1336)</code> dihapus, akhiran <code>,TOKO</code>/<code
-              >.TOKO</code
-            >
-            dibuang, diawali <code>Toko</code>, ditulis Kapital Tiap Kata
-            (singkatan 1–2 huruf spt <code>BU</code>,
-            <code>CV</code> dipertahkan). Tabel surat memakai nama asli Excel.
-          </div>
         </div>
       </div>
 
@@ -216,7 +198,7 @@
       <div class="sr-card locked" id="sr-c4">
         <div class="sr-card-h">
           <i class="ti ti-download"></i> Ekspor
-          <span class="badge">1 file / distributor · dibundel ZIP</span>
+          <span class="badge">1 file / grup · dibundel ZIP</span>
         </div>
         <div class="sr-card-b">
           <div class="sr-btnrow">
@@ -233,10 +215,9 @@
             <div class="pl" id="sr-pl"></div>
           </div>
           <div class="sr-note">
-            <b>Word</b> mengikuti template aktif 100% (kop, tanda tangan, tabel)
-            — cepat, disarankan untuk volume besar. <b>PDF</b> berbasis render
-            gambar &amp; hanya untuk template bawaan. Nama file = nama
-            distributor.
+            <b>Word</b> mengikuti template aktif 100% — cepat, disarankan untuk
+            volume besar. <b>PDF</b> berbasis render gambar &amp; hanya untuk
+            template bawaan. Nama file = nama grup.
           </div>
         </div>
       </div>
@@ -268,15 +249,9 @@
           "November",
           "Desember",
         ];
-        var PH = [
-          "${nomor_naskah}",
-          "${nama_cust}",
-          "${tbl_nama}",
-          "${tbl_target}",
-          "${tbl_monthly}",
-          "${tbl_quarterly}",
-          "${tbl_total}",
-        ];
+        var SRC_NOMOR = "__NOMOR__",
+          SRC_DATE = "__DATE__",
+          SRC_EMPTY = "__EMPTY__";
 
         var defaultB64 = null,
           defaultZip = null,
@@ -286,7 +261,12 @@
           tplLetter = "",
           tplTail = "",
           isCustom = false;
-        var customers = [],
+        var columns = [],
+          rows = [],
+          placeholders = [],
+          mapping = {},
+          groupCol = "";
+        var records = [],
           distOrder = [],
           viewIdx = 0;
 
@@ -319,7 +299,7 @@
             String(s)
               .replace(/[\\/:*?"<>|]+/g, "-")
               .replace(/\s+/g, " ")
-              .trim() || "Distributor"
+              .trim() || "Surat"
           );
         }
         function fmtNum(v) {
@@ -359,6 +339,9 @@
           for (var i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
           return new Blob([arr], { type: mime });
         }
+        function isSpecial(s) {
+          return s === SRC_NOMOR || s === SRC_DATE || s === SRC_EMPTY;
+        }
 
         function transformName(raw) {
           var s = String(raw || "").trim();
@@ -384,7 +367,7 @@
           return ("Toko " + s).replace(/\s{2,}/g, " ").trim();
         }
 
-        // ---- repair placeholders split across runs (Word fragments text) ----
+        // repair placeholders split across runs (Word fragments text)
         function normalizePlaceholders(xml) {
           return xml.replace(
             /\$(?:<[^>]+>)*\{(?:[^{}<]|<[^>]+>){0,300}?\}/g,
@@ -399,8 +382,249 @@
             },
           );
         }
+        function detectPlaceholders() {
+          var out = [],
+            seen = {},
+            re = /\$\{([^}<]+)\}/g,
+            m;
+          while ((m = re.exec(tplLetter))) {
+            var k = m[1];
+            if (!seen[k]) {
+              seen[k] = 1;
+              out.push(k);
+            }
+          }
+          return out;
+        }
 
-        // ---- activate a template (default or custom) ----
+        function matchCol() {
+          var keys = [].slice.call(arguments).map(function (k) {
+            return k.toUpperCase();
+          });
+          for (var i = 0; i < columns.length; i++) {
+            var u = columns[i].toUpperCase();
+            for (var k = 0; k < keys.length; k++) {
+              if (u.indexOf(keys[k]) >= 0) return columns[i];
+            }
+          }
+          return "";
+        }
+        function fuzzyCol(pl) {
+          var toks = pl
+            .toLowerCase()
+            .split(/[_\s]+/)
+            .filter(function (t) {
+              return t.length >= 3;
+            });
+          for (var i = 0; i < columns.length; i++) {
+            var u = columns[i].toLowerCase();
+            for (var t = 0; t < toks.length; t++) {
+              if (u.indexOf(toks[t]) >= 0) return columns[i];
+            }
+          }
+          return "";
+        }
+        function guessTf(pl, col) {
+          var s = (pl + " " + (col || "")).toLowerCase();
+          return /target|total|cost|harga|nominal|jumlah|tagihan|amount|nilai|biaya|qty|saldo|rp/.test(
+            s,
+          )
+            ? "num"
+            : "raw";
+        }
+        function guessMapping(pl) {
+          var lc = pl.toLowerCase();
+          var KN = {
+            nomor_naskah: [SRC_NOMOR, "raw"],
+            nama_cust: [matchCol("CUSTOMER"), "toko"],
+            tbl_nama: [matchCol("CUSTOMER"), "raw"],
+            tbl_target: [matchCol("TARGET"), "num"],
+            tbl_monthly: [matchCol("MONTHLY"), "num"],
+            tbl_quarterly: [matchCol("QUARTERLY"), "num"],
+            tbl_total: [matchCol("TOTAL"), "num"],
+            tanggal: [SRC_DATE, "raw"],
+          };
+          if (KN[lc]) return { src: KN[lc][0] || SRC_EMPTY, tf: KN[lc][1] };
+          if (
+            lc === "no" ||
+            lc.indexOf("nomor") >= 0 ||
+            lc.indexOf("naskah") >= 0 ||
+            lc.indexOf("nosurat") >= 0
+          )
+            return { src: SRC_NOMOR, tf: "raw" };
+          if (
+            lc.indexOf("tanggal") >= 0 ||
+            lc.indexOf("tgl") >= 0 ||
+            lc.indexOf("date") >= 0
+          )
+            return { src: SRC_DATE, tf: "raw" };
+          var col = fuzzyCol(pl);
+          return { src: col || SRC_EMPTY, tf: guessTf(pl, col) };
+        }
+        function rebuildMapping() {
+          var next = {};
+          placeholders.forEach(function (pl) {
+            var cur = mapping[pl];
+            if (cur && (isSpecial(cur.src) || columns.indexOf(cur.src) >= 0))
+              next[pl] = cur;
+            else next[pl] = guessMapping(pl);
+          });
+          mapping = next;
+          if (!groupCol || columns.indexOf(groupCol) < 0)
+            groupCol = matchCol("DISTRIBUTOR") || "";
+        }
+
+        function renderMappingUI() {
+          var el = $("sr-map");
+          if (!placeholders.length) {
+            el.innerHTML =
+              '<div class="sr-map-hint">Template belum termuat atau tidak mengandung placeholder <code>${...}</code>. Unggah template atau gunakan bawaan.</div>';
+            return;
+          }
+          if (!columns.length) {
+            el.innerHTML =
+              '<div class="sr-map-head"><i class="ti ti-arrows-left-right"></i> Pemetaan placeholder → kolom</div><div class="sr-map-hint">Unggah file Excel dulu agar kolomnya bisa dipetakan. Placeholder terdeteksi: ' +
+              placeholders
+                .map(function (p) {
+                  return "<code>${" + htmlEsc(p) + "}</code>";
+                })
+                .join(" ") +
+              "</div>";
+            return;
+          }
+          function srcOpts(sel) {
+            var o =
+              '<optgroup label="Kolom Excel">' +
+              columns
+                .map(function (c) {
+                  return (
+                    '<option value="' +
+                    htmlEsc(c) +
+                    '"' +
+                    (sel === c ? " selected" : "") +
+                    ">" +
+                    htmlEsc(c) +
+                    "</option>"
+                  );
+                })
+                .join("") +
+              "</optgroup>";
+            o +=
+              '<optgroup label="Otomatis"><option value="' +
+              SRC_NOMOR +
+              '"' +
+              (sel === SRC_NOMOR ? " selected" : "") +
+              ">Nomor otomatis</option>" +
+              '<option value="' +
+              SRC_DATE +
+              '"' +
+              (sel === SRC_DATE ? " selected" : "") +
+              ">Tanggal surat</option>" +
+              '<option value="' +
+              SRC_EMPTY +
+              '"' +
+              (sel === SRC_EMPTY || !sel ? " selected" : "") +
+              ">— kosong —</option></optgroup>";
+            return o;
+          }
+          function tfOpts(sel) {
+            return [
+              ["raw", "Apa adanya"],
+              ["num", "Format angka (1.000)"],
+              ["toko", "Nama toko (Toko + Kapital)"],
+            ]
+              .map(function (o) {
+                return (
+                  '<option value="' +
+                  o[0] +
+                  '"' +
+                  (sel === o[0] ? " selected" : "") +
+                  ">" +
+                  o[1] +
+                  "</option>"
+                );
+              })
+              .join("");
+          }
+          var rowsH = placeholders
+            .map(function (pl) {
+              var m = mapping[pl],
+                unset = !m.src || m.src === SRC_EMPTY ? " unset" : "";
+              return (
+                '<div class="sr-map-row"><code class="sr-map-ph">${' +
+                htmlEsc(pl) +
+                "}</code>" +
+                '<select class="sr-sel sr-src' +
+                unset +
+                '" data-pl="' +
+                htmlEsc(pl) +
+                '">' +
+                srcOpts(m.src) +
+                "</select>" +
+                '<select class="sr-sel sr-tf" data-pl="' +
+                htmlEsc(pl) +
+                '">' +
+                tfOpts(m.tf) +
+                "</select></div>"
+              );
+            })
+            .join("");
+          var groupOpts =
+            '<option value="">— tidak dikelompokkan (1 file) —</option>' +
+            columns
+              .map(function (c) {
+                return (
+                  '<option value="' +
+                  htmlEsc(c) +
+                  '"' +
+                  (groupCol === c ? " selected" : "") +
+                  ">" +
+                  htmlEsc(c) +
+                  "</option>"
+                );
+              })
+              .join("");
+          el.innerHTML =
+            '<div class="sr-map-head"><i class="ti ti-arrows-left-right"></i> Pemetaan placeholder → kolom Excel</div>' +
+            '<div class="sr-map-tblwrap"><div class="sr-map-colhdr"><span>Placeholder</span><span>Sumber data</span><span>Format</span></div>' +
+            rowsH +
+            "</div>" +
+            '<div class="sr-map-grouprow"><label>Kelompokkan jadi 1 file per:</label><select class="sr-sel" id="sr-groupcol">' +
+            groupOpts +
+            "</select></div>" +
+            '<div class="sr-map-legend">Tiap <code>${...}</code> diisi dari sumber pilihanmu. <b>Format</b>: <i>Apa adanya</i> = teks asli · <i>Angka</i> = pemisah ribuan (800.000) · <i>Nama toko</i> = buang kode/,TOKO, diawali "Toko", Kapital Tiap Kata.</div>';
+          el.querySelectorAll(".sr-src").forEach(function (s) {
+            s.addEventListener("change", function () {
+              var pl = s.dataset.pl;
+              mapping[pl].src = s.value;
+              s.classList.toggle("unset", !s.value || s.value === SRC_EMPTY);
+              clearOverride(pl);
+              recompute();
+            });
+          });
+          el.querySelectorAll(".sr-tf").forEach(function (s) {
+            s.addEventListener("change", function () {
+              var pl = s.dataset.pl;
+              mapping[pl].tf = s.value;
+              clearOverride(pl);
+              recompute();
+            });
+          });
+          var g = $("sr-groupcol");
+          if (g)
+            g.addEventListener("change", function () {
+              groupCol = g.value;
+              recompute();
+            });
+        }
+        function clearOverride(pl) {
+          rows.forEach(function (r) {
+            if (r._ov && Object.prototype.hasOwnProperty.call(r._ov, pl))
+              delete r._ov[pl];
+          });
+        }
+
+        // ---- activate template ----
         function setActiveTemplate(zip, name, custom) {
           var f = zip.file("word/document.xml");
           if (!f)
@@ -419,35 +643,16 @@
             tplTail = doc.slice(b);
             activeZip = zip;
             isCustom = custom;
-            var found = PH.filter(function (p) {
-              return tplLetter.indexOf(p) >= 0;
-            });
-            var missing = PH.filter(function (p) {
-              return tplLetter.indexOf(p) < 0;
-            });
-            updateTplUI(name, found, missing, custom);
-            if (customers.length) renderPreview();
+            updateTplUI(name, custom);
+            onTemplateOrDataChange();
           });
         }
-
-        function updateTplUI(name, found, missing, custom) {
+        function updateTplUI(name, custom) {
           $("sr-tpl-name").textContent = name;
           var det = $("sr-tpl-detect");
           if (custom) {
-            var html =
-              found
-                .map(function (p) {
-                  return '<span class="sr-ph ok">' + htmlEsc(p) + " ✓</span>";
-                })
-                .join("") +
-              missing
-                .map(function (p) {
-                  return '<span class="sr-ph miss">' + htmlEsc(p) + " ✕</span>";
-                })
-                .join("");
-            html +=
-              ' <button class="sr-tpl-reset" id="sr-tpl-reset">↺ kembali ke template bawaan</button>';
-            det.innerHTML = html;
+            det.innerHTML =
+              '<button class="sr-tpl-reset" id="sr-tpl-reset">↺ kembali ke template bawaan</button>';
             var rb = $("sr-tpl-reset");
             if (rb)
               rb.addEventListener("click", function () {
@@ -460,26 +665,15 @@
                     toast("Template bawaan aktif kembali");
                   });
               });
-            if (missing.length)
-              toast(
-                "Perhatian: " +
-                  missing.length +
-                  " placeholder tidak ditemukan di template",
-              );
-          } else {
-            det.innerHTML = "";
-          }
-          // PDF only for default template
-          var pdf = $("sr-btn-pdf");
-          pdf.disabled = custom;
+          } else det.innerHTML = "";
+          $("sr-btn-pdf").disabled = custom;
           var pa = $("sr-prev-all");
           if (pa) pa.disabled = custom;
           $("sr-pdf-note").textContent = custom
-            ? "PDF nonaktif untuk template custom — pakai Word"
+            ? "PDF & pratinjau-semua nonaktif untuk template custom — pakai Word"
             : "";
         }
 
-        // ---- lazy-load default template (waits for JSZip; CDN loads async) ----
         function ensureTemplate() {
           if (defaultZip) return Promise.resolve();
           if (tplLoading) return tplLoading;
@@ -508,6 +702,13 @@
           return tplLoading;
         }
 
+        function onTemplateOrDataChange() {
+          placeholders = detectPlaceholders();
+          rebuildMapping();
+          renderMappingUI();
+          recompute();
+        }
+
         // ---- excel upload ----
         var drop = $("sr-drop"),
           fileInput = $("sr-file");
@@ -533,31 +734,6 @@
           if (e.target.files[0]) handleExcel(e.target.files[0]);
         });
 
-        function colFinder(headers) {
-          var H = headers.map(function (h) {
-            return String(h || "")
-              .toUpperCase()
-              .trim();
-          });
-          function find() {
-            var keys = [].slice.call(arguments);
-            for (var i = 0; i < H.length; i++) {
-              for (var k = 0; k < keys.length; k++) {
-                if (H[i].indexOf(keys[k]) >= 0) return i;
-              }
-            }
-            return -1;
-          }
-          return {
-            dist: find("DISTRIBUTOR"),
-            cust: find("NAMA CUSTOMER", "CUSTOMER"),
-            target: find("TARGET"),
-            monthly: find("MONTHLY"),
-            quarterly: find("QUARTERLY"),
-            total: find("TOTAL"),
-          };
-        }
-
         function handleExcel(f) {
           ensureTemplate().catch(function (e) {
             toast("Template default gagal dimuat: " + e.message);
@@ -574,69 +750,55 @@
                   });
                   var sh =
                     wb.Sheets["Rebate DB"] || wb.Sheets[wb.SheetNames[0]];
-                  var rows = XLSX.utils.sheet_to_json(sh, {
+                  var aoa = XLSX.utils.sheet_to_json(sh, {
                     header: 1,
                     raw: true,
                     defval: "",
                   });
-                  var hi = rows.findIndex(function (r) {
-                    return r.some(function (c) {
-                      return (
-                        String(c).toUpperCase().indexOf("NAMA CUSTOMER") >= 0
-                      );
-                    });
+                  var hi = aoa.findIndex(function (r) {
+                    return (
+                      r.filter(function (c) {
+                        return String(c).trim() !== "";
+                      }).length >= 2
+                    );
                   });
                   if (hi < 0) hi = 0;
-                  var col = colFinder(rows[hi]);
-                  if (col.cust < 0) {
-                    toast("Kolom NAMA CUSTOMER tidak ditemukan");
+                  var hdr = aoa[hi].map(function (c) {
+                    return String(c == null ? "" : c).trim();
+                  });
+                  var seen = {};
+                  columns = hdr.map(function (c, i) {
+                    var name =
+                      c || "Kolom " + String.fromCharCode(65 + (i % 26));
+                    if (seen[name] != null) {
+                      seen[name]++;
+                      name = name + " (" + seen[name] + ")";
+                    } else seen[name] = 0;
+                    return name;
+                  });
+                  rows = aoa.slice(hi + 1).map(function (r) {
+                    var o = {};
+                    columns.forEach(function (c, i) {
+                      o[c] = r[i] == null ? "" : r[i];
+                    });
+                    return o;
+                  });
+                  if (!rows.length) {
+                    toast("Tidak ada baris data terbaca");
                     return;
                   }
-                  customers = [];
-                  var last = "";
-                  for (var r = hi + 1; r < rows.length; r++) {
-                    var row = rows[r];
-                    if (!row) continue;
-                    var d =
-                      col.dist >= 0 ? String(row[col.dist] || "").trim() : "";
-                    if (d) last = d;
-                    var cust = String(row[col.cust] || "").trim();
-                    if (!cust) continue;
-                    customers.push({
-                      dist: last || "(Tanpa Distributor)",
-                      rawName: cust,
-                      name: transformName(cust),
-                      target: fmtNum(row[col.target]),
-                      monthly: fmtNum(row[col.monthly]),
-                      quarterly: fmtNum(row[col.quarterly]),
-                      total: fmtNum(row[col.total]),
-                    });
-                  }
-                  if (!customers.length) {
-                    toast("Tidak ada baris customer terbaca");
-                    return;
-                  }
-                  distOrder = customers
-                    .map(function (c) {
-                      return c.dist;
-                    })
-                    .filter(function (v, i, a) {
-                      return a.indexOf(v) === i;
-                    });
                   $("sr-chip").style.display = "flex";
                   $("sr-chip-txt").innerHTML =
                     "<b>" +
                     htmlEsc(f.name) +
                     "</b> — " +
-                    customers.length +
-                    " customer · " +
-                    distOrder.length +
-                    " distributor";
-                  ["sr-c2", "sr-c3", "sr-c4"].forEach(function (id) {
-                    $(id).classList.remove("locked");
-                  });
-                  setStep(3);
-                  assignAndRender();
+                    columns.length +
+                    " kolom · " +
+                    rows.length +
+                    " baris";
+                  $("sr-c2").classList.remove("locked");
+                  setStep(2);
+                  onTemplateOrDataChange();
                 } catch (err) {
                   toast("Gagal membaca Excel: " + err.message);
                 }
@@ -693,68 +855,158 @@
             });
         });
 
-        // ---- numbering + render ----
+        // ---- numbering ----
         function assignNumbers() {
           var startStr = ($("sr-start").value || "1").trim(),
             digits = startStr.replace(/\D/g, "") || "1";
           var start = parseInt(digits, 10) || 1,
             width = digits.length,
             fmt = $("sr-fmt").value;
-          customers.forEach(function (c, i) {
-            c.nomor = String(start + i).padStart(width, "0") + fmt;
+          records.forEach(function (r, i) {
+            r._nomor = String(start + i).padStart(width, "0") + fmt;
           });
-          var first = customers[0] ? customers[0].nomor : "—",
-            lastN = customers.length
-              ? customers[customers.length - 1].nomor
-              : "—";
+          var first = records[0] ? records[0]._nomor : "—",
+            lastN = records.length ? records[records.length - 1]._nomor : "—";
           $("sr-np-first").textContent = first;
-          $("sr-np-range").textContent = customers.length
+          $("sr-np-range").textContent = records.length
             ? "rentang " +
               first +
               "  →  " +
               lastN +
               "  ·  " +
-              customers.length +
+              records.length +
               " surat"
             : "";
         }
+
+        // ---- value resolution ----
+        function getValue(r, pl) {
+          if (r._ov && Object.prototype.hasOwnProperty.call(r._ov, pl))
+            return r._ov[pl];
+          var m = mapping[pl];
+          if (!m) return "";
+          var raw;
+          if (m.src === SRC_NOMOR) raw = r._nomor || "";
+          else if (m.src === SRC_DATE) raw = ($("sr-tgl").value || "").trim();
+          else if (m.src === SRC_EMPTY || !m.src) raw = "";
+          else raw = r[m.src] == null ? "" : r[m.src];
+          if (m.tf === "num") return fmtNum(raw);
+          if (m.tf === "toko") return transformName(raw);
+          return String(raw);
+        }
+
+        // ---- recompute records ----
+        function recompute() {
+          if (!tplLetter || !columns.length || !rows.length) {
+            return;
+          }
+          var gc = groupCol && columns.indexOf(groupCol) >= 0 ? groupCol : "";
+          var totalRe =
+            /^\s*(grand\s*total|sub\s*total|subtotal|total|jumlah)\b/i;
+          var last = "";
+          rows.forEach(function (r) {
+            if (gc) {
+              var gv = String(r[gc] == null ? "" : r[gc]).trim();
+              var istot = !!(gv && totalRe.test(gv));
+              if (gv && !istot) last = gv;
+              r._g = last;
+              r._istotal = istot;
+            } else {
+              r._g = "(semua)";
+              r._istotal = false;
+            }
+          });
+          records = rows.filter(function (r) {
+            if (r._istotal) return false;
+            return columns.some(function (c) {
+              return c !== gc && String(r[c] == null ? "" : r[c]).trim() !== "";
+            });
+          });
+          distOrder = gc
+            ? records
+                .map(function (r) {
+                  return r._g;
+                })
+                .filter(function (v, i, a) {
+                  return a.indexOf(v) === i;
+                })
+            : ["(semua)"];
+          assignNumbers();
+          if (viewIdx >= records.length) viewIdx = 0;
+          if (records.length) {
+            ["sr-c3", "sr-c4"].forEach(function (id) {
+              $(id).classList.remove("locked");
+            });
+            setStep(4);
+          }
+          renderStats();
+          renderTable();
+          renderPreview();
+        }
+
         function renderStats() {
-          var tc = customers.reduce(function (s, c) {
-            return s + (Number(String(c.total).replace(/\./g, "")) || 0);
-          }, 0);
-          $("sr-stats").innerHTML =
+          if (!records.length) {
+            $("sr-stats").innerHTML = "";
+            return;
+          }
+          var html =
             '<div class="sr-stat"><b>' +
             distOrder.length +
-            "</b>Distributor · file</div>" +
+            "</b>" +
+            (groupCol ? "Grup · file" : "File") +
+            "</div>" +
             '<div class="sr-stat"><b>' +
-            customers.length +
-            "</b>Surat customer</div>" +
+            records.length +
+            "</b>Surat</div>" +
             '<div class="sr-stat"><b>' +
-            customers[0].nomor.split("/")[0] +
+            records[0]._nomor.split("/")[0] +
             "–" +
-            customers[customers.length - 1].nomor.split("/")[0] +
-            "</b>Rentang nomor</div>" +
-            '<div class="sr-stat"><b>Rp ' +
-            tc.toLocaleString("id-ID") +
-            "</b>Estimasi total cost</div>";
+            records[records.length - 1]._nomor.split("/")[0] +
+            "</b>Rentang nomor</div>";
+          var totalCol = matchCol("TOTAL");
+          if (totalCol) {
+            var t = records.reduce(function (s, r) {
+              return (
+                s + (Number(String(r[totalCol]).replace(/[^\d.-]/g, "")) || 0)
+              );
+            }, 0);
+            html +=
+              '<div class="sr-stat"><b>Rp ' +
+              t.toLocaleString("id-ID") +
+              "</b>Total " +
+              htmlEsc(totalCol.toLowerCase()) +
+              "</div>";
+          }
+          $("sr-stats").innerHTML = html;
         }
+
         function renderTable() {
+          $("sr-thead").innerHTML =
+            "<tr><th>No</th>" +
+            placeholders
+              .map(function (p) {
+                return "<th>${" + htmlEsc(p) + "}</th>";
+              })
+              .join("") +
+            "</tr>";
           var tb = $("sr-tbody");
           tb.innerHTML = "";
           var cur = null,
             idx = 0;
-          customers.forEach(function (c, fi) {
-            if (c.dist !== cur) {
-              cur = c.dist;
+          records.forEach(function (r, fi) {
+            if (r._g !== cur) {
+              cur = r._g;
               idx = 0;
-              var cnt = customers.filter(function (x) {
-                return x.dist === c.dist;
+              var cnt = records.filter(function (x) {
+                return x._g === r._g;
               }).length;
               var dr = document.createElement("tr");
               dr.className = "sr-dist";
               dr.innerHTML =
-                '<td colspan="8">▸ ' +
-                htmlEsc(c.dist) +
+                '<td colspan="' +
+                (placeholders.length + 1) +
+                '">▸ ' +
+                htmlEsc(r._g) +
                 ' <span class="cnt">— ' +
                 cnt +
                 " surat</span></td>";
@@ -764,37 +1016,26 @@
             var tr = document.createElement("tr");
             tr.className = "sr-clk";
             tr.dataset.fi = fi;
-            tr.innerHTML =
-              "<td>" +
-              idx +
-              '</td><td class="sr-nomor-td">' +
-              htmlEsc(c.nomor) +
-              "</td>" +
-              '<td class="sr-raw">' +
-              htmlEsc(c.rawName) +
-              '</td><td class="sr-nm-td"></td>' +
-              '<td class="sr-num">' +
-              htmlEsc(c.target) +
-              '</td><td class="sr-num">' +
-              htmlEsc(c.monthly) +
-              "</td>" +
-              '<td class="sr-num">' +
-              htmlEsc(c.quarterly) +
-              '</td><td class="sr-num">' +
-              htmlEsc(c.total) +
-              "</td>";
-            var inp = document.createElement("input");
-            inp.type = "text";
-            inp.className = "sr-nm-in";
-            inp.value = c.name;
-            inp.addEventListener("input", function () {
-              c.name = inp.value;
-              if (viewIdx === fi) showLetter(fi);
+            var td0 = document.createElement("td");
+            td0.textContent = idx;
+            tr.appendChild(td0);
+            placeholders.forEach(function (pl) {
+              var td = document.createElement("td");
+              var ed = document.createElement("div");
+              ed.className = "sr-ed";
+              ed.contentEditable = "true";
+              ed.textContent = getValue(r, pl);
+              ed.addEventListener("mousedown", function (e) {
+                e.stopPropagation();
+              });
+              ed.addEventListener("input", function () {
+                if (!r._ov) r._ov = {};
+                r._ov[pl] = ed.textContent;
+                if (Number(tr.dataset.fi) === viewIdx) showLetter(viewIdx);
+              });
+              td.appendChild(ed);
+              tr.appendChild(td);
             });
-            inp.addEventListener("click", function (e) {
-              e.stopPropagation();
-            });
-            tr.children[3].appendChild(inp);
             tr.addEventListener("click", function () {
               showLetter(fi);
               $("sr-stage").scrollIntoView({
@@ -806,29 +1047,51 @@
           });
         }
         function highlightRow() {
-          var rows = $("sr-tbody").querySelectorAll("tr.sr-clk");
-          rows.forEach(function (r) {
-            r.classList.toggle("sr-active", Number(r.dataset.fi) === viewIdx);
-          });
-        }
-        function assignAndRender() {
-          if (!customers.length) return;
-          assignNumbers();
-          renderStats();
-          renderTable();
-          renderPreview();
+          $("sr-tbody")
+            .querySelectorAll("tr.sr-clk")
+            .forEach(function (r) {
+              r.classList.toggle("sr-active", Number(r.dataset.fi) === viewIdx);
+            });
         }
 
         $("sr-start").addEventListener("input", function () {
-          if (customers.length) assignAndRender();
+          if (records.length) {
+            assignNumbers();
+            showLetter(viewIdx);
+          }
+        });
+        $("sr-start").addEventListener("change", function () {
+          if (records.length) recompute();
         });
         $("sr-fmt").addEventListener("input", function () {
-          if (customers.length) assignAndRender();
+          if (records.length) {
+            assignNumbers();
+            showLetter(viewIdx);
+          }
         });
-        $("sr-tgl").addEventListener("input", renderPreview);
+        $("sr-fmt").addEventListener("change", function () {
+          if (records.length) recompute();
+        });
+        $("sr-tgl").addEventListener("input", function () {
+          if (records.length) showLetter(viewIdx);
+        });
+        $("sr-tgl").addEventListener("change", function () {
+          if (records.length) recompute();
+        });
         $("sr-tgl").value = todayID();
 
-        // ---- letter html (preview + pdf, for the default layout) ----
+        // ---- letter html (default layout) ----
+        function defaultView(r) {
+          return {
+            nomor: getValue(r, "nomor_naskah"),
+            name: getValue(r, "nama_cust"),
+            rawName: getValue(r, "tbl_nama"),
+            target: getValue(r, "tbl_target"),
+            monthly: getValue(r, "tbl_monthly"),
+            quarterly: getValue(r, "tbl_quarterly"),
+            total: getValue(r, "tbl_total"),
+          };
+        }
         function letterHTML(c) {
           var tgl = ($("sr-tgl").value || "").trim() || "13 Juli 2026";
           return (
@@ -876,50 +1139,43 @@
             "</div>"
           );
         }
-        function dataCardHTML(c) {
+        function dataCardHTML(r) {
+          var rowsH = placeholders
+            .map(function (pl) {
+              return (
+                '<div class="dc-row"><span>${' +
+                htmlEsc(pl) +
+                "}</span><b>" +
+                htmlEsc(getValue(r, pl)) +
+                "</b></div>"
+              );
+            })
+            .join("");
           return (
-            '<div class="sr-datacard">' +
-            '<div class="dc-row"><span>Nomor Surat</span><b class="mono">' +
-            htmlEsc(c.nomor) +
+            '<div class="sr-datacard"><div class="dc-row"><span>Grup / file</span><b>' +
+            htmlEsc(r._g) +
             "</b></div>" +
-            '<div class="dc-row"><span>Kepada (nama pada surat)</span><b>' +
-            htmlEsc(c.name) +
-            "</b></div>" +
-            '<div class="dc-row"><span>Nama Customer (Excel)</span><b>' +
-            htmlEsc(c.rawName) +
-            "</b></div>" +
-            '<div class="dc-row"><span>Distributor / file</span><b>' +
-            htmlEsc(c.dist) +
-            "</b></div>" +
-            '<table class="dc-tbl"><tr><th>Target</th><th>Monthly</th><th>Quarterly</th><th>Total</th></tr>' +
-            "<tr><td>" +
-            htmlEsc(c.target) +
-            "</td><td>" +
-            htmlEsc(c.monthly) +
-            "</td><td>" +
-            htmlEsc(c.quarterly) +
-            "</td><td>" +
-            htmlEsc(c.total) +
-            "</td></tr></table>" +
-            '<div class="dc-note">Template custom aktif — nilai di atas yang akan mengisi placeholder di template kamu. Pratinjau visual penuh tersedia untuk template bawaan.</div>' +
-            "</div>"
+            rowsH +
+            '<div class="dc-note">Template custom aktif — nilai di atas mengisi placeholder di template kamu. Pratinjau visual penuh tersedia untuk template bawaan.</div></div>'
           );
         }
         function showLetter(i) {
-          if (!customers.length) return;
-          viewIdx = Math.max(0, Math.min(i, customers.length - 1));
-          var c = customers[viewIdx];
+          if (!records.length) return;
+          viewIdx = Math.max(0, Math.min(i, records.length - 1));
+          var r = records[viewIdx];
           $("sr-vcur").textContent = viewIdx + 1;
-          $("sr-vtot").textContent = customers.length;
-          $("sr-vdist").textContent = c.dist;
+          $("sr-vtot").textContent = records.length;
+          $("sr-vdist").textContent = r._g;
           $("sr-vprev").disabled = viewIdx <= 0;
-          $("sr-vnext").disabled = viewIdx >= customers.length - 1;
-          $("sr-stage").innerHTML = isCustom ? dataCardHTML(c) : letterHTML(c);
+          $("sr-vnext").disabled = viewIdx >= records.length - 1;
+          $("sr-stage").innerHTML = isCustom
+            ? dataCardHTML(r)
+            : letterHTML(defaultView(r));
           highlightRow();
         }
         function renderPreview() {
-          if (!customers.length) return;
-          if (viewIdx >= customers.length) viewIdx = 0;
+          if (!records.length) return;
+          if (viewIdx >= records.length) viewIdx = 0;
           showLetter(viewIdx);
         }
         $("sr-vprev").addEventListener("click", function () {
@@ -931,8 +1187,8 @@
         $("sr-prev-all").addEventListener("click", openAllPreview);
 
         function openAllPreview() {
-          if (!customers.length) {
-            toast("Belum ada data Excel");
+          if (!records.length) {
+            toast("Belum ada data");
             return;
           }
           if (isCustom) {
@@ -942,10 +1198,10 @@
             return;
           }
           if (
-            customers.length > 250 &&
+            records.length > 250 &&
             !confirm(
               "Ada " +
-                customers.length +
+                records.length +
                 " surat. Membuka semua bisa berat. Lanjutkan?",
             )
           )
@@ -957,65 +1213,57 @@
           }
           var css = document.querySelector('link[href*="style_surat_rebate"]');
           var href = css ? css.href : "/assets/css/style_surat_rebate.css";
-          var body = customers
-            .map(function (c, i) {
+          var body = records
+            .map(function (r, i) {
               return (
                 '<div class="pv-item"><div class="pv-lbl">#' +
                 (i + 1) +
                 " · " +
-                htmlEsc(c.dist) +
+                htmlEsc(r._g) +
                 " · " +
-                htmlEsc(c.nomor) +
+                htmlEsc(getValue(r, "nomor_naskah")) +
                 "</div>" +
-                letterHTML(c) +
+                letterHTML(defaultView(r)) +
                 "</div>"
               );
             })
             .join("");
           w.document.write(
             '<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Pratinjau semua surat (' +
-              customers.length +
+              records.length +
               ")</title>" +
               '<link rel="stylesheet" href="' +
               href +
               '">' +
               "<style>body{background:#cfc9bb;margin:0;padding:20px 0}.pv-bar{position:sticky;top:0;background:#16202e;color:#fff;padding:10px 16px;font:14px system-ui;display:flex;gap:12px;align-items:center;z-index:5;margin:-20px 0 16px}.pv-bar button{background:#0f766e;color:#fff;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font:600 13px system-ui}.pv-lbl{max-width:210mm;margin:0 auto 6px;font:600 12px ui-monospace,monospace;color:#3a3a34}.pv-item{margin-bottom:26px}@media print{body{background:#fff;padding:0}.pv-bar,.pv-lbl{display:none}.rebate-letter{box-shadow:none;margin:0;page-break-after:always}}</style></head><body>" +
               '<div class="pv-bar"><b>' +
-              customers.length +
-              ' surat</b><span>— gulir untuk cek tiap baris</span><button onclick="window.print()">🖨 Cetak / Simpan PDF</button></div>' +
+              records.length +
+              ' surat</b><span>— gulir untuk cek tiap baris</span><button onclick="window.print()">Cetak / Simpan PDF</button></div>' +
               body +
               "</body></html>",
           );
           w.document.close();
         }
 
-        // ---- word export (uses ACTIVE template) ----
-        function fillLetterXml(c, tgl) {
-          var s = tplLetter,
-            map = [
-              ["${nomor_naskah}", c.nomor],
-              ["${nama_cust}", c.name],
-              ["${tbl_nama}", c.rawName],
-              ["${tbl_target}", c.target],
-              ["${tbl_monthly}", c.monthly],
-              ["${tbl_quarterly}", c.quarterly],
-              ["${tbl_total}", c.total],
-              ["${tanggal}", tgl || ""],
-            ];
-          for (var i = 0; i < map.length; i++)
-            s = s.split(map[i][0]).join(xmlEsc(map[i][1]));
+        // ---- word export ----
+        function fillLetterXml(r) {
+          var s = tplLetter;
+          placeholders.forEach(function (pl) {
+            s = s.split("${" + pl + "}").join(xmlEsc(getValue(r, pl)));
+          });
+          var tgl = ($("sr-tgl").value || "").trim();
           if (tgl)
             s = s
               .split("Surakarta, 13 Juli 2026")
               .join("Surakarta, " + xmlEsc(tgl));
           return s;
         }
-        function docxForDistributor(list, tgl) {
+        function docxForGroup(list) {
           var doc =
             tplHead +
             list
-              .map(function (c) {
-                return fillLetterXml(c, tgl);
+              .map(function (r) {
+                return fillLetterXml(r);
               })
               .join(PB) +
             tplTail;
@@ -1026,31 +1274,33 @@
           });
         }
         $("sr-btn-word").addEventListener("click", function () {
-          if (!customers.length) {
-            toast("Belum ada data Excel");
+          if (!records.length) {
+            toast("Belum ada data");
             return;
           }
           setProg(true);
           (activeZip ? Promise.resolve() : ensureTemplate())
             .then(function () {
-              var tgl = ($("sr-tgl").value || "").trim(),
-                out = new JSZip(),
+              var out = new JSZip(),
                 i = 0;
               (function next() {
                 if (i >= distOrder.length) {
                   setBar(1, "Membungkus ZIP…");
                   return out.generateAsync({ type: "blob" }).then(function (b) {
-                    dl(b, "Surat_Rebate_Word.zip");
+                    dl(b, "Surat_Word.zip");
                     toast("Selesai — " + distOrder.length + " file Word");
                     setProg(false);
                   });
                 }
                 var d = distOrder[i],
-                  list = customers.filter(function (c) {
-                    return c.dist === d;
+                  list = records.filter(function (r) {
+                    return r._g === d;
                   });
-                docxForDistributor(list, tgl).then(function (bytes) {
-                  out.file(safeFile(d) + ".docx", bytes);
+                docxForGroup(list).then(function (bytes) {
+                  out.file(
+                    (groupCol ? safeFile(d) : "Semua_Surat") + ".docx",
+                    bytes,
+                  );
                   i++;
                   setBar(
                     i / distOrder.length,
@@ -1066,20 +1316,20 @@
             });
         });
 
-        // ---- pdf export (default layout only) ----
+        // ---- pdf export (default only) ----
         $("sr-btn-pdf").addEventListener("click", function () {
           if (isCustom) {
             toast(
-              "PDF hanya untuk template bawaan. Untuk template custom, ekspor Word lalu Save as PDF di Word.",
+              "PDF hanya untuk template bawaan. Untuk custom, ekspor Word lalu Save as PDF.",
             );
             return;
           }
-          if (!customers.length) {
-            toast("Belum ada data Excel");
+          if (!records.length) {
+            toast("Belum ada data");
             return;
           }
           if (typeof html2pdf === "undefined") {
-            toast("Modul PDF belum siap — cek koneksi lalu ulangi");
+            toast("Modul PDF belum siap");
             return;
           }
           setProg(true);
@@ -1097,19 +1347,19 @@
             if (i >= distOrder.length) {
               setBar(1, "Membungkus ZIP…");
               return out.generateAsync({ type: "blob" }).then(function (b) {
-                dl(b, "Surat_Rebate_PDF.zip");
+                dl(b, "Surat_PDF.zip");
                 toast("Selesai — " + distOrder.length + " file PDF");
                 setProg(false);
               });
             }
             var d = distOrder[i],
-              list = customers.filter(function (c) {
-                return c.dist === d;
+              list = records.filter(function (r) {
+                return r._g === d;
               });
             var wrap = document.createElement("div");
             wrap.innerHTML = list
-              .map(function (c, j) {
-                return letterHTML(c).replace(
+              .map(function (r, j) {
+                return letterHTML(defaultView(r)).replace(
                   'class="rebate-letter"',
                   'class="rebate-letter" style="' +
                     (j < list.length - 1 ? "page-break-after:always;" : "") +
@@ -1123,7 +1373,10 @@
               .from(wrap)
               .outputPdf("blob")
               .then(function (blob) {
-                out.file(safeFile(d) + ".pdf", blob);
+                out.file(
+                  (groupCol ? safeFile(d) : "Semua_Surat") + ".pdf",
+                  blob,
+                );
                 stage.removeChild(wrap);
                 i++;
                 setBar(

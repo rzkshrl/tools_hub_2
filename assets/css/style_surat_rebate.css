@@ -581,6 +581,144 @@ td.sr-num {
   margin-left: 0.25rem;
 }
 
+/* placeholder → column mapping */
+.sr-map {
+  margin-bottom: 1.1rem;
+}
+.sr-map-hint {
+  font-size: 13px;
+  color: var(--text2);
+  padding: 0.9rem 1rem;
+  background: var(--surface2);
+  border: 0.5px dashed var(--border2);
+  border-radius: var(--radius);
+}
+.sr-map-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal-2);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sr-map-head .ti {
+  color: var(--teal);
+}
+.sr-map-tblwrap {
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.sr-map-colhdr,
+.sr-map-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.1fr) minmax(140px, 1.4fr) minmax(
+      120px,
+      1fr
+    );
+  gap: 0.55rem;
+  align-items: center;
+}
+.sr-map-colhdr {
+  padding: 0.4rem 0.7rem;
+  background: var(--text);
+  color: #fff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+.sr-map-row {
+  padding: 0.5rem 0.7rem;
+  border-bottom: 0.5px solid var(--border2);
+}
+.sr-map-row:last-child {
+  border-bottom: none;
+}
+.sr-map-row:nth-child(even) {
+  background: var(--surface2);
+}
+.sr-map-ph {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--teal-2);
+  background: var(--teal-bg);
+  padding: 3px 8px;
+  border-radius: 6px;
+  justify-self: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sr-sel {
+  width: 100%;
+  padding: 7px 9px;
+  border: 0.5px solid var(--border2);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.sr-sel:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal-bg);
+}
+.sr-sel.unset {
+  border-color: #e0b36a;
+  background: #fdf5e6;
+}
+.sr-map-grouprow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--teal-bg);
+  border-radius: var(--radius);
+}
+.sr-map-grouprow label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal-2);
+}
+.sr-map-grouprow .sr-sel {
+  width: auto;
+  min-width: 210px;
+  flex: 0 1 auto;
+}
+.sr-map-legend {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+
+/* generic editable cell in periksa table */
+td .sr-ed {
+  min-width: 90px;
+  padding: 4px 7px;
+  border: 0.5px solid transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
+  background: transparent;
+  color: var(--text);
+  white-space: nowrap;
+}
+td .sr-ed:hover {
+  border-color: var(--border2);
+}
+td .sr-ed:focus {
+  outline: none;
+  border-color: var(--teal);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--teal-bg);
+}
+
 /* letter preview + viewer */
 .sr-prevhead {
   display: flex;
