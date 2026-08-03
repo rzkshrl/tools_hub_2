@@ -201,6 +201,15 @@
           <span class="badge">1 file / grup · dibundel ZIP</span>
         </div>
         <div class="sr-card-b">
+          <div class="sr-outrow">
+            <label for="sr-outmode">Bentuk keluaran</label>
+            <select class="sr-sel" id="sr-outmode">
+              <option value="split">Pisah — 1 file per surat (ZIP)</option>
+              <option value="combined">
+                Gabung — semua surat jadi 1 file Word
+              </option>
+            </select>
+          </div>
           <div class="sr-btnrow">
             <button class="sr-btn" id="sr-btn-word">
               <i class="ti ti-file-type-docx"></i> Ekspor Word — ZIP
@@ -271,7 +280,8 @@
           viewIdx = 0,
           units = [],
           groupNomor = {},
-          mode = "single";
+          mode = "single",
+          outMode = "split";
 
         function $(id) {
           return document.getElementById(id);
@@ -625,6 +635,9 @@
         function onModeChange() {
           var ms = $("sr-mode");
           if (ms) mode = ms.value;
+          outMode = mode === "repeat" ? "combined" : "split";
+          var om = $("sr-outmode");
+          if (om) om.value = outMode;
           placeholders.forEach(function (pl) {
             if (!mapping[pl]._lvlUser)
               mapping[pl].lvl = autoLvl(pl, mapping[pl]);
@@ -897,9 +910,26 @@
           $("sr-btn-pdf").disabled = visualOff;
           var pa = $("sr-prev-all");
           if (pa) pa.disabled = visualOff;
+          var perLabel = mode === "repeat" ? "distributor" : "grup";
+          var om = $("sr-outmode");
+          if (om) {
+            om.options[0].text = "Pisah — 1 file per " + perLabel + " (ZIP)";
+            om.value = outMode;
+          }
+          var wb = $("sr-btn-word");
+          if (wb)
+            wb.innerHTML =
+              '<i class="ti ti-file-type-docx"></i> Ekspor Word — ' +
+              (outMode === "combined" ? "1 file" : "ZIP");
+          var badge = document.querySelector("#sr-c4 .badge");
+          if (badge)
+            badge.textContent =
+              outMode === "combined"
+                ? "semua surat → 1 file Word"
+                : "1 file / " + perLabel + " · dibundel ZIP";
           $("sr-pdf-note").textContent =
             mode === "repeat"
-              ? "Mode baris berulang: ekspor 1 file Word gabungan. PDF/pratinjau-visual nonaktif."
+              ? "Mode baris berulang: PDF/pratinjau-visual nonaktif — pakai Word."
               : isCustom
                 ? "PDF & pratinjau-semua nonaktif untuk template custom — pakai Word"
                 : "";
@@ -1638,33 +1668,36 @@
           setProg(true);
           (activeZip ? Promise.resolve() : ensureTemplate())
             .then(function () {
-              if (mode === "repeat") {
+              // ---- COMBINED: all letters in one .docx ----
+              if (outMode === "combined") {
                 setBar(0.5, "Menyusun surat…");
-                var doc =
-                  tplHead +
-                  distOrder
-                    .map(function (g) {
-                      return fillRepeating(
-                        records.filter(function (r) {
-                          return r._g === g;
-                        }),
-                      );
-                    })
-                    .join(PB) +
-                  tplTail;
-                activeZip.file("word/document.xml", doc);
+                var body =
+                  mode === "repeat"
+                    ? distOrder
+                        .map(function (g) {
+                          return fillRepeating(
+                            records.filter(function (r) {
+                              return r._g === g;
+                            }),
+                          );
+                        })
+                        .join(PB)
+                    : records
+                        .map(function (r) {
+                          return fillLetterXml(r);
+                        })
+                        .join(PB);
+                activeZip.file("word/document.xml", tplHead + body + tplTail);
+                var n = mode === "repeat" ? distOrder.length : records.length;
                 return activeZip
                   .generateAsync({ type: "blob", compression: "DEFLATE" })
                   .then(function (b) {
                     dl(b, "Surat.docx");
-                    toast(
-                      "Selesai — " +
-                        distOrder.length +
-                        " surat dalam 1 file Word",
-                    );
+                    toast("Selesai — " + n + " surat dalam 1 file Word");
                     setProg(false);
                   });
               }
+              // ---- SPLIT: one .docx per distributor/group, zipped ----
               var out = new JSZip(),
                 i = 0;
               (function next() {
@@ -1680,24 +1713,47 @@
                   list = records.filter(function (r) {
                     return r._g === d;
                   });
-                docxForGroup(list).then(function (bytes) {
-                  out.file(
-                    (groupCol ? safeFile(d) : "Semua_Surat") + ".docx",
-                    bytes,
+                var fname = (groupCol ? safeFile(d) : "Semua_Surat") + ".docx";
+                if (mode === "repeat") {
+                  activeZip.file(
+                    "word/document.xml",
+                    tplHead + fillRepeating(list) + tplTail,
                   );
-                  i++;
-                  setBar(
-                    i / distOrder.length,
-                    "Word · " + i + "/" + distOrder.length + " — " + d,
-                  );
-                  setTimeout(next, 0);
-                });
+                  activeZip
+                    .generateAsync({
+                      type: "uint8array",
+                      compression: "DEFLATE",
+                    })
+                    .then(function (bytes) {
+                      out.file(fname, bytes);
+                      i++;
+                      setBar(
+                        i / distOrder.length,
+                        "Word · " + i + "/" + distOrder.length + " — " + d,
+                      );
+                      setTimeout(next, 0);
+                    });
+                } else {
+                  docxForGroup(list).then(function (bytes) {
+                    out.file(fname, bytes);
+                    i++;
+                    setBar(
+                      i / distOrder.length,
+                      "Word · " + i + "/" + distOrder.length + " — " + d,
+                    );
+                    setTimeout(next, 0);
+                  });
+                }
               })();
             })
             .catch(function (e) {
               toast("Gagal: " + e.message);
               setProg(false);
             });
+        });
+        $("sr-outmode").addEventListener("change", function () {
+          outMode = this.value;
+          updateExportUI();
         });
 
         // ---- pdf export (default only) ----

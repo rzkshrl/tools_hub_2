@@ -709,6 +709,23 @@ td.sr-num {
   border: 0.5px solid var(--border);
   border-radius: var(--radius);
 }
+.sr-outrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.sr-outrow label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sr-outrow .sr-sel {
+  width: auto;
+  min-width: 280px;
+  flex: 0 1 340px;
+}
 .sr-map-mode label {
   font-size: 13px;
   font-weight: 600;
