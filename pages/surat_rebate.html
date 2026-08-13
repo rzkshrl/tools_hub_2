@@ -197,6 +197,40 @@
       <!-- 4 -->
       <div class="sr-card locked" id="sr-c4">
         <div class="sr-card-h">
+          <div class="sr-fnbox">
+            <label class="sr-fncheck">
+              <input type="checkbox" id="sr-fn-on" />
+              <span>Kustomisasi nama file export</span>
+            </label>
+            <div class="sr-fngrid" id="sr-fngrid">
+              <div class="sr-fld">
+                <label class="lbl"
+                  >Nomor awal <span class="q">— naik +1 tiap file</span></label
+                >
+                <input
+                  type="text"
+                  id="sr-fn-start"
+                  value="189"
+                  inputmode="numeric"
+                />
+              </div>
+              <div class="sr-fld">
+                <label class="lbl"
+                  >Format nama file
+                  <span class="q"
+                    >— <code>{n}</code> nomor, <code>{grup}</code> nama
+                    grup</span
+                  >
+                </label>
+                <input
+                  type="text"
+                  id="sr-fn-fmt"
+                  value="EM {n} - Insentive Salesman Distributor Juli - {grup}"
+                />
+              </div>
+            </div>
+            <div class="sr-fnprev" id="sr-fnprev"></div>
+          </div>
           <i class="ti ti-download"></i> Ekspor
           <span class="badge">1 file / grup · dibundel ZIP</span>
         </div>
@@ -315,6 +349,46 @@
               .trim() || "Surat"
           );
         }
+        function exportFileName(idx, groupName) {
+          var fallback = groupCol ? safeFile(groupName) : "Semua_Surat";
+          if (!fnOn()) return fallback;
+          var st = fnStart(),
+            num = String(st.n + idx).padStart(st.width, "0");
+          var fmt = $("sr-fn-fmt").value || "{n} - {grup}";
+          var name = fmt
+            .split("{n}")
+            .join(num)
+            .split("{grup}")
+            .join(groupCol ? groupName : "Semua Surat");
+          return safeFile(name);
+        }
+        function updateFnPreview() {
+          var box = $("sr-fnprev");
+          if (!fnOn() || !distOrder.length) {
+            box.classList.remove("on");
+            return;
+          }
+          var first = exportFileName(0, distOrder[0]);
+          var lastIdx = distOrder.length - 1;
+          var last = exportFileName(lastIdx, distOrder[lastIdx]);
+          box.innerHTML =
+            "Contoh: <b>" +
+            htmlEsc(first) +
+            ".docx</b>" +
+            (distOrder.length > 1
+              ? "  →  <b>" + htmlEsc(last) + ".docx</b>"
+              : "") +
+            "  ·  " +
+            distOrder.length +
+            " file";
+          box.classList.add("on");
+        }
+        $("sr-fn-on").addEventListener("change", function () {
+          $("sr-fngrid").classList.toggle("on", fnOn());
+          updateFnPreview();
+        });
+        $("sr-fn-start").addEventListener("input", updateFnPreview);
+        $("sr-fn-fmt").addEventListener("input", updateFnPreview);
         function fmtNum(v) {
           if (v === "" || v == null) return "";
           var n = Number(String(v).replace(/,/g, ""));
