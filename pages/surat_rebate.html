@@ -201,6 +201,40 @@
           <span class="badge">1 file / grup · dibundel ZIP</span>
         </div>
         <div class="sr-card-b">
+          <div class="sr-fnbox">
+            <label class="sr-fncheck">
+              <input type="checkbox" id="sr-fn-on" />
+              <span>Kustomisasi nama file export</span>
+            </label>
+            <div class="sr-fngrid" id="sr-fngrid">
+              <div class="sr-fld">
+                <label class="lbl"
+                  >Nomor awal <span class="q">— naik +1 tiap file</span></label
+                >
+                <input
+                  type="text"
+                  id="sr-fn-start"
+                  value="189"
+                  inputmode="numeric"
+                />
+              </div>
+              <div class="sr-fld">
+                <label class="lbl"
+                  >Format nama file
+                  <span class="q"
+                    >— <code>{n}</code> nomor, <code>{grup}</code> nama
+                    grup</span
+                  ></label
+                >
+                <input
+                  type="text"
+                  id="sr-fn-fmt"
+                  value="EM {n} - Insentive Salesman Distributor Juli - {grup}"
+                />
+              </div>
+            </div>
+            <div class="sr-fnprev" id="sr-fnprev"></div>
+          </div>
           <div class="sr-btnrow">
             <button class="sr-btn" id="sr-btn-word">
               <i class="ti ti-file-type-docx"></i> Ekspor Word — ZIP
@@ -217,7 +251,8 @@
           <div class="sr-note">
             <b>Word</b> mengikuti template aktif 100% — cepat, disarankan untuk
             volume besar. <b>PDF</b> berbasis render gambar &amp; hanya untuk
-            template bawaan. Nama file = nama grup.
+            template bawaan. Nama file default = nama grup, atau nama custom di
+            atas bila diaktifkan.
           </div>
         </div>
       </div>
@@ -302,6 +337,55 @@
               .trim() || "Surat"
           );
         }
+
+        // ---- custom export filename ----
+        function fnOn() {
+          return $("sr-fn-on").checked;
+        }
+        function fnStart() {
+          var digits = ($("sr-fn-start").value || "1").replace(/\D/g, "");
+          return { n: parseInt(digits, 10) || 1, width: digits.length || 1 };
+        }
+        function exportFileName(idx, groupName) {
+          var fallback = groupCol ? safeFile(groupName) : "Semua_Surat";
+          if (!fnOn()) return fallback;
+          var st = fnStart(),
+            num = String(st.n + idx).padStart(st.width, "0");
+          var fmt = $("sr-fn-fmt").value || "{n} - {grup}";
+          var name = fmt
+            .split("{n}")
+            .join(num)
+            .split("{grup}")
+            .join(groupCol ? groupName : "Semua Surat");
+          return safeFile(name);
+        }
+        function updateFnPreview() {
+          var box = $("sr-fnprev");
+          if (!fnOn() || !distOrder.length) {
+            box.classList.remove("on");
+            return;
+          }
+          var first = exportFileName(0, distOrder[0]);
+          var lastIdx = distOrder.length - 1;
+          var last = exportFileName(lastIdx, distOrder[lastIdx]);
+          box.innerHTML =
+            "Contoh: <b>" +
+            htmlEsc(first) +
+            ".docx</b>" +
+            (distOrder.length > 1
+              ? "  →  <b>" + htmlEsc(last) + ".docx</b>"
+              : "") +
+            "  ·  " +
+            distOrder.length +
+            " file";
+          box.classList.add("on");
+        }
+        $("sr-fn-on").addEventListener("change", function () {
+          $("sr-fngrid").classList.toggle("on", fnOn());
+          updateFnPreview();
+        });
+        $("sr-fn-start").addEventListener("input", updateFnPreview);
+        $("sr-fn-fmt").addEventListener("input", updateFnPreview);
         function fmtNum(v) {
           if (v === "" || v == null) return "";
           var n = Number(String(v).replace(/,/g, ""));
@@ -942,6 +1026,7 @@
           renderStats();
           renderTable();
           renderPreview();
+          updateFnPreview();
         }
 
         function renderStats() {
@@ -1297,10 +1382,7 @@
                     return r._g === d;
                   });
                 docxForGroup(list).then(function (bytes) {
-                  out.file(
-                    (groupCol ? safeFile(d) : "Semua_Surat") + ".docx",
-                    bytes,
-                  );
+                  out.file(exportFileName(i, d) + ".docx", bytes);
                   i++;
                   setBar(
                     i / distOrder.length,
@@ -1373,10 +1455,7 @@
               .from(wrap)
               .outputPdf("blob")
               .then(function (blob) {
-                out.file(
-                  (groupCol ? safeFile(d) : "Semua_Surat") + ".pdf",
-                  blob,
-                );
+                out.file(exportFileName(i, d) + ".pdf", blob);
                 stage.removeChild(wrap);
                 i++;
                 setBar(
