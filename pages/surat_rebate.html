@@ -201,39 +201,14 @@
           <span class="badge">1 file / grup · dibundel ZIP</span>
         </div>
         <div class="sr-card-b">
-          <div class="sr-fnbox">
-            <label class="sr-fncheck">
-              <input type="checkbox" id="sr-fn-on" />
-              <span>Kustomisasi nama file export</span>
-            </label>
-            <div class="sr-fngrid" id="sr-fngrid">
-              <div class="sr-fld">
-                <label class="lbl"
-                  >Nomor awal <span class="q">— naik +1 tiap file</span></label
-                >
-                <input
-                  type="text"
-                  id="sr-fn-start"
-                  value="189"
-                  inputmode="numeric"
-                />
-              </div>
-              <div class="sr-fld">
-                <label class="lbl"
-                  >Format nama file
-                  <span class="q"
-                    >— <code>{n}</code> nomor, <code>{grup}</code> nama
-                    grup</span
-                  ></label
-                >
-                <input
-                  type="text"
-                  id="sr-fn-fmt"
-                  value="EM {n} - Insentive Salesman Distributor Juli - {grup}"
-                />
-              </div>
-            </div>
-            <div class="sr-fnprev" id="sr-fnprev"></div>
+          <div class="sr-outrow">
+            <label for="sr-outmode">Bentuk keluaran</label>
+            <select class="sr-sel" id="sr-outmode">
+              <option value="split">Pisah — 1 file per surat (ZIP)</option>
+              <option value="combined">
+                Gabung — semua surat jadi 1 file Word
+              </option>
+            </select>
           </div>
           <div class="sr-btnrow">
             <button class="sr-btn" id="sr-btn-word">
@@ -251,8 +226,7 @@
           <div class="sr-note">
             <b>Word</b> mengikuti template aktif 100% — cepat, disarankan untuk
             volume besar. <b>PDF</b> berbasis render gambar &amp; hanya untuk
-            template bawaan. Nama file default = nama grup, atau nama custom di
-            atas bila diaktifkan.
+            template bawaan. Nama file = nama grup.
           </div>
         </div>
       </div>
@@ -303,7 +277,11 @@
           groupCol = "";
         var records = [],
           distOrder = [],
-          viewIdx = 0;
+          viewIdx = 0,
+          units = [],
+          groupNomor = {},
+          mode = "single",
+          outMode = "split";
 
         function $(id) {
           return document.getElementById(id);
@@ -337,55 +315,6 @@
               .trim() || "Surat"
           );
         }
-
-        // ---- custom export filename ----
-        function fnOn() {
-          return $("sr-fn-on").checked;
-        }
-        function fnStart() {
-          var digits = ($("sr-fn-start").value || "1").replace(/\D/g, "");
-          return { n: parseInt(digits, 10) || 1, width: digits.length || 1 };
-        }
-        function exportFileName(idx, groupName) {
-          var fallback = groupCol ? safeFile(groupName) : "Semua_Surat";
-          if (!fnOn()) return fallback;
-          var st = fnStart(),
-            num = String(st.n + idx).padStart(st.width, "0");
-          var fmt = $("sr-fn-fmt").value || "{n} - {grup}";
-          var name = fmt
-            .split("{n}")
-            .join(num)
-            .split("{grup}")
-            .join(groupCol ? groupName : "Semua Surat");
-          return safeFile(name);
-        }
-        function updateFnPreview() {
-          var box = $("sr-fnprev");
-          if (!fnOn() || !distOrder.length) {
-            box.classList.remove("on");
-            return;
-          }
-          var first = exportFileName(0, distOrder[0]);
-          var lastIdx = distOrder.length - 1;
-          var last = exportFileName(lastIdx, distOrder[lastIdx]);
-          box.innerHTML =
-            "Contoh: <b>" +
-            htmlEsc(first) +
-            ".docx</b>" +
-            (distOrder.length > 1
-              ? "  →  <b>" + htmlEsc(last) + ".docx</b>"
-              : "") +
-            "  ·  " +
-            distOrder.length +
-            " file";
-          box.classList.add("on");
-        }
-        $("sr-fn-on").addEventListener("change", function () {
-          $("sr-fngrid").classList.toggle("on", fnOn());
-          updateFnPreview();
-        });
-        $("sr-fn-start").addEventListener("input", updateFnPreview);
-        $("sr-fn-fmt").addEventListener("input", updateFnPreview);
         function fmtNum(v) {
           if (v === "" || v == null) return "";
           var n = Number(String(v).replace(/,/g, ""));
@@ -480,7 +409,131 @@
           }
           return out;
         }
+        // is a placeholder located inside a table row <w:tr>?
+        function inRow(pl) {
+          var idx = tplLetter.indexOf("${" + pl + "}");
+          if (idx < 0) return false;
+          var pre = tplLetter.slice(0, idx);
+          return pre.lastIndexOf("<w:tr") > pre.lastIndexOf("</w:tr>");
+        }
+        // find the repeating <w:tr>: the one carrying the most ${...}
+        function findRepeatingRow(xml) {
+          var re = /<w:tr\b[\s\S]*?<\/w:tr>/g,
+            m,
+            best = null,
+            bestN = 0;
+          while ((m = re.exec(xml))) {
+            var n = (m[0].match(/\$\{/g) || []).length;
+            if (n > bestN) {
+              bestN = n;
+              best = { start: m.index, end: m.index + m[0].length, xml: m[0] };
+            }
+          }
+          return bestN > 0 ? best : null;
+        }
+        // depth-aware split of a <w:tr> into {open, tcs[], close}
+        function splitRow(rowXml) {
+          var firstTc = rowXml.indexOf("<w:tc");
+          var open = rowXml.slice(0, firstTc),
+            close = "</w:tr>";
+          var body = rowXml.slice(firstTc, rowXml.lastIndexOf("</w:tr>"));
+          var tcs = [],
+            depth = 0,
+            start = 0,
+            re = /<w:tc\b[^>]*>|<\/w:tc>/g,
+            m;
+          while ((m = re.exec(body))) {
+            if (m[0].charAt(1) === "/") {
+              depth--;
+              if (depth === 0)
+                tcs.push(body.slice(start, m.index + m[0].length));
+            } else {
+              if (depth === 0) start = m.index;
+              depth++;
+            }
+          }
+          return { open: open, tcs: tcs, close: close };
+        }
+        function setVMerge(tc, mode) {
+          var tag =
+            mode === "restart" ? '<w:vMerge w:val="restart"/>' : "<w:vMerge/>";
+          tc = tc.replace(/<w:vMerge[^>]*\/>/, "");
+          if (/<w:tcPr>/.test(tc))
+            return tc.replace("<w:tcPr>", "<w:tcPr>" + tag);
+          if (/<w:tcPr\b[^>]*>/.test(tc))
+            return tc.replace(/(<w:tcPr\b[^>]*>)/, "$1" + tag);
+          return tc.replace(
+            /(<w:tc\b[^>]*>)/,
+            "$1<w:tcPr>" + tag + "</w:tcPr>",
+          );
+        }
 
+        // read a sheet -> {columns, rows}; auto-flatten a two-tier header (merged group header + sub-header)
+        function readSheet(sh) {
+          var aoa = XLSX.utils.sheet_to_json(sh, {
+            header: 1,
+            raw: true,
+            defval: "",
+          });
+          var merges = sh["!merges"] || [];
+          function ne(row) {
+            return (row || []).filter(function (c) {
+              return String(c).trim() !== "";
+            }).length;
+          }
+          var top = aoa.findIndex(function (r) {
+            return ne(r) >= 2;
+          });
+          if (top < 0) top = 0;
+          var ncol = aoa.reduce(function (m, r) {
+            return Math.max(m, r.length);
+          }, 0);
+          function cell(r, c) {
+            return aoa[r] && aoa[r][c] != null ? aoa[r][c] : "";
+          }
+          var horiz = merges.some(function (m) {
+            return m.s.r === top && m.e.c > m.s.c;
+          });
+          var hdr = [],
+            dataStart,
+            c;
+          if (horiz) {
+            var sub = top + 1,
+              topRow = [];
+            for (c = 0; c < ncol; c++) topRow[c] = String(cell(top, c)).trim();
+            merges.forEach(function (m) {
+              if (m.s.r === top && m.e.c > m.s.c) {
+                var v = String(cell(m.s.r, m.s.c)).trim();
+                for (var cc = m.s.c; cc <= m.e.c; cc++) topRow[cc] = v;
+              }
+            });
+            for (c = 0; c < ncol; c++) {
+              var s = String(cell(sub, c)).trim();
+              hdr[c] = s || topRow[c] || "";
+            }
+            dataStart = sub + 1;
+          } else {
+            for (c = 0; c < ncol; c++) hdr[c] = String(cell(top, c)).trim();
+            dataStart = top + 1;
+          }
+          var seen = {},
+            cols = hdr.map(function (h, i) {
+              var name = h || "Kolom " + String.fromCharCode(65 + (i % 26));
+              if (seen[name] != null) {
+                seen[name]++;
+                name = name + " (" + seen[name] + ")";
+              } else seen[name] = 0;
+              return name;
+            });
+          var rws = aoa.slice(dataStart).map(function (r) {
+            var o = {};
+            cols.forEach(function (cn, i) {
+              o[cn] = r[i] == null ? "" : r[i];
+            });
+            return o;
+          });
+          return { columns: cols, rows: rws };
+        }
         function matchCol() {
           var keys = [].slice.call(arguments).map(function (k) {
             return k.toUpperCase();
@@ -545,6 +598,11 @@
           var col = fuzzyCol(pl);
           return { src: col || SRC_EMPTY, tf: guessTf(pl, col) };
         }
+        function autoLvl(pl, m) {
+          if (groupCol && m.src === groupCol) return "surat";
+          if (m.src === SRC_NOMOR || m.src === SRC_DATE) return "surat";
+          return inRow(pl) ? "baris" : "surat";
+        }
         function rebuildMapping() {
           var next = {};
           placeholders.forEach(function (pl) {
@@ -556,8 +614,38 @@
           mapping = next;
           if (!groupCol || columns.indexOf(groupCol) < 0)
             groupCol = matchCol("DISTRIBUTOR") || "";
+          placeholders.forEach(function (pl) {
+            var m = mapping[pl];
+            if (!m._lvlUser) m.lvl = autoLvl(pl, m);
+          });
         }
 
+        function modeSelHTML() {
+          return (
+            '<div class="sr-map-mode"><label>Mode surat</label><select class="sr-sel" id="sr-mode">' +
+            '<option value="single"' +
+            (mode === "single" ? " selected" : "") +
+            ">1 baris Excel = 1 surat (mis. rebate outlet)</option>" +
+            '<option value="repeat"' +
+            (mode === "repeat" ? " selected" : "") +
+            ">1 grup = 1 surat, baris tabel berulang (mis. insentif salesman)</option>" +
+            "</select></div>"
+          );
+        }
+        function onModeChange() {
+          var ms = $("sr-mode");
+          if (ms) mode = ms.value;
+          outMode = mode === "repeat" ? "combined" : "split";
+          var om = $("sr-outmode");
+          if (om) om.value = outMode;
+          placeholders.forEach(function (pl) {
+            if (!mapping[pl]._lvlUser)
+              mapping[pl].lvl = autoLvl(pl, mapping[pl]);
+          });
+          renderMappingUI();
+          recompute();
+          updateExportUI();
+        }
         function renderMappingUI() {
           var el = $("sr-map");
           if (!placeholders.length) {
@@ -567,6 +655,7 @@
           }
           if (!columns.length) {
             el.innerHTML =
+              modeSelHTML() +
               '<div class="sr-map-head"><i class="ti ti-arrows-left-right"></i> Pemetaan placeholder → kolom</div><div class="sr-map-hint">Unggah file Excel dulu agar kolomnya bisa dipetakan. Placeholder terdeteksi: ' +
               placeholders
                 .map(function (p) {
@@ -574,8 +663,11 @@
                 })
                 .join(" ") +
               "</div>";
+            var m0 = $("sr-mode");
+            if (m0) m0.addEventListener("change", onModeChange);
             return;
           }
+          var rep = mode === "repeat";
           function srcOpts(sel) {
             var o =
               '<optgroup label="Kolom Excel">' +
@@ -630,10 +722,35 @@
               })
               .join("");
           }
+          function lvlOpts(sel) {
+            return [
+              ["baris", "Per baris tabel"],
+              ["surat", "Per surat (sekali)"],
+            ]
+              .map(function (o) {
+                return (
+                  '<option value="' +
+                  o[0] +
+                  '"' +
+                  (sel === o[0] ? " selected" : "") +
+                  ">" +
+                  o[1] +
+                  "</option>"
+                );
+              })
+              .join("");
+          }
           var rowsH = placeholders
             .map(function (pl) {
               var m = mapping[pl],
                 unset = !m.src || m.src === SRC_EMPTY ? " unset" : "";
+              var lvlCell = rep
+                ? '<select class="sr-sel sr-lvl" data-pl="' +
+                  htmlEsc(pl) +
+                  '">' +
+                  lvlOpts(m.lvl) +
+                  "</select>"
+                : "";
               return (
                 '<div class="sr-map-row"><code class="sr-map-ph">${' +
                 htmlEsc(pl) +
@@ -649,12 +766,19 @@
                 htmlEsc(pl) +
                 '">' +
                 tfOpts(m.tf) +
-                "</select></div>"
+                "</select>" +
+                lvlCell +
+                "</div>"
               );
             })
             .join("");
+          var colhdr = rep
+            ? '<div class="sr-map-colhdr rep"><span>Placeholder</span><span>Sumber data</span><span>Format</span><span>Tingkat</span></div>'
+            : '<div class="sr-map-colhdr"><span>Placeholder</span><span>Sumber data</span><span>Format</span></div>';
           var groupOpts =
-            '<option value="">— tidak dikelompokkan (1 file) —</option>' +
+            (rep
+              ? ""
+              : '<option value="">— tidak dikelompokkan (1 file) —</option>') +
             columns
               .map(function (c) {
                 return (
@@ -669,20 +793,36 @@
               })
               .join("");
           el.innerHTML =
+            modeSelHTML() +
             '<div class="sr-map-head"><i class="ti ti-arrows-left-right"></i> Pemetaan placeholder → kolom Excel</div>' +
-            '<div class="sr-map-tblwrap"><div class="sr-map-colhdr"><span>Placeholder</span><span>Sumber data</span><span>Format</span></div>' +
+            '<div class="sr-map-tblwrap' +
+            (rep ? " rep" : "") +
+            '">' +
+            colhdr +
             rowsH +
             "</div>" +
-            '<div class="sr-map-grouprow"><label>Kelompokkan jadi 1 file per:</label><select class="sr-sel" id="sr-groupcol">' +
+            '<div class="sr-map-grouprow"><label>' +
+            (rep
+              ? "Satu surat per (grup baris tabel):"
+              : "Kelompokkan jadi 1 file per:") +
+            '</label><select class="sr-sel" id="sr-groupcol">' +
             groupOpts +
             "</select></div>" +
-            '<div class="sr-map-legend">Tiap <code>${...}</code> diisi dari sumber pilihanmu. <b>Format</b>: <i>Apa adanya</i> = teks asli · <i>Angka</i> = pemisah ribuan (800.000) · <i>Nama toko</i> = buang kode/,TOKO, diawali "Toko", Kapital Tiap Kata.</div>';
+            '<div class="sr-map-legend">' +
+            (rep
+              ? "Mode <b>baris berulang</b>: placeholder <b>Per baris tabel</b> ditulis ulang tiap baris salesman; <b>Per surat</b> (nomor, tanggal, distributor) diisi sekali. Placeholder yang dipetakan ke kolom grup otomatis jadi sel <b>menyatu vertikal</b> di kolom pertama. Cukup taruh placeholder <b>sekali</b> di satu baris tabel template — tools yang menggandakan."
+              : 'Tiap <code>${...}</code> diisi dari sumber pilihanmu. <b>Format</b>: <i>Apa adanya</i> = teks asli · <i>Angka</i> = pemisah ribuan (800.000) · <i>Nama toko</i> = buang kode/,TOKO, diawali "Toko", Kapital Tiap Kata.') +
+            "</div>";
+          var ms = $("sr-mode");
+          if (ms) ms.addEventListener("change", onModeChange);
           el.querySelectorAll(".sr-src").forEach(function (s) {
             s.addEventListener("change", function () {
               var pl = s.dataset.pl;
               mapping[pl].src = s.value;
-              s.classList.toggle("unset", !s.value || s.value === SRC_EMPTY);
+              if (!mapping[pl]._lvlUser)
+                mapping[pl].lvl = autoLvl(pl, mapping[pl]);
               clearOverride(pl);
+              renderMappingUI();
               recompute();
             });
           });
@@ -694,10 +834,23 @@
               recompute();
             });
           });
+          el.querySelectorAll(".sr-lvl").forEach(function (s) {
+            s.addEventListener("change", function () {
+              var pl = s.dataset.pl;
+              mapping[pl].lvl = s.value;
+              mapping[pl]._lvlUser = true;
+              recompute();
+            });
+          });
           var g = $("sr-groupcol");
           if (g)
             g.addEventListener("change", function () {
               groupCol = g.value;
+              placeholders.forEach(function (pl) {
+                if (!mapping[pl]._lvlUser)
+                  mapping[pl].lvl = autoLvl(pl, mapping[pl]);
+              });
+              renderMappingUI();
               recompute();
             });
         }
@@ -750,12 +903,36 @@
                   });
               });
           } else det.innerHTML = "";
-          $("sr-btn-pdf").disabled = custom;
+          updateExportUI();
+        }
+        function updateExportUI() {
+          var visualOff = isCustom || mode === "repeat";
+          $("sr-btn-pdf").disabled = visualOff;
           var pa = $("sr-prev-all");
-          if (pa) pa.disabled = custom;
-          $("sr-pdf-note").textContent = custom
-            ? "PDF & pratinjau-semua nonaktif untuk template custom — pakai Word"
-            : "";
+          if (pa) pa.disabled = visualOff;
+          var perLabel = mode === "repeat" ? "distributor" : "grup";
+          var om = $("sr-outmode");
+          if (om) {
+            om.options[0].text = "Pisah — 1 file per " + perLabel + " (ZIP)";
+            om.value = outMode;
+          }
+          var wb = $("sr-btn-word");
+          if (wb)
+            wb.innerHTML =
+              '<i class="ti ti-file-type-docx"></i> Ekspor Word — ' +
+              (outMode === "combined" ? "1 file" : "ZIP");
+          var badge = document.querySelector("#sr-c4 .badge");
+          if (badge)
+            badge.textContent =
+              outMode === "combined"
+                ? "semua surat → 1 file Word"
+                : "1 file / " + perLabel + " · dibundel ZIP";
+          $("sr-pdf-note").textContent =
+            mode === "repeat"
+              ? "Mode baris berulang: PDF/pratinjau-visual nonaktif — pakai Word."
+              : isCustom
+                ? "PDF & pratinjau-semua nonaktif untuk template custom — pakai Word"
+                : "";
         }
 
         function ensureTemplate() {
@@ -834,39 +1011,9 @@
                   });
                   var sh =
                     wb.Sheets["Rebate DB"] || wb.Sheets[wb.SheetNames[0]];
-                  var aoa = XLSX.utils.sheet_to_json(sh, {
-                    header: 1,
-                    raw: true,
-                    defval: "",
-                  });
-                  var hi = aoa.findIndex(function (r) {
-                    return (
-                      r.filter(function (c) {
-                        return String(c).trim() !== "";
-                      }).length >= 2
-                    );
-                  });
-                  if (hi < 0) hi = 0;
-                  var hdr = aoa[hi].map(function (c) {
-                    return String(c == null ? "" : c).trim();
-                  });
-                  var seen = {};
-                  columns = hdr.map(function (c, i) {
-                    var name =
-                      c || "Kolom " + String.fromCharCode(65 + (i % 26));
-                    if (seen[name] != null) {
-                      seen[name]++;
-                      name = name + " (" + seen[name] + ")";
-                    } else seen[name] = 0;
-                    return name;
-                  });
-                  rows = aoa.slice(hi + 1).map(function (r) {
-                    var o = {};
-                    columns.forEach(function (c, i) {
-                      o[c] = r[i] == null ? "" : r[i];
-                    });
-                    return o;
-                  });
+                  var parsed = readSheet(sh);
+                  columns = parsed.columns;
+                  rows = parsed.rows;
                   if (!rows.length) {
                     toast("Tidak ada baris data terbaca");
                     return;
@@ -946,20 +1093,33 @@
           var start = parseInt(digits, 10) || 1,
             width = digits.length,
             fmt = $("sr-fmt").value;
-          records.forEach(function (r, i) {
-            r._nomor = String(start + i).padStart(width, "0") + fmt;
-          });
-          var first = records[0] ? records[0]._nomor : "—",
-            lastN = records.length ? records[records.length - 1]._nomor : "—";
+          var n = mode === "repeat" ? distOrder.length : records.length,
+            first = "—",
+            lastN = "—";
+          if (mode === "repeat") {
+            groupNomor = {};
+            distOrder.forEach(function (g, i) {
+              groupNomor[g] = String(start + i).padStart(width, "0") + fmt;
+            });
+            records.forEach(function (r) {
+              r._nomor = groupNomor[r._g] || "";
+            });
+            if (distOrder.length) {
+              first = groupNomor[distOrder[0]];
+              lastN = groupNomor[distOrder[distOrder.length - 1]];
+            }
+          } else {
+            records.forEach(function (r, i) {
+              r._nomor = String(start + i).padStart(width, "0") + fmt;
+            });
+            if (records.length) {
+              first = records[0]._nomor;
+              lastN = records[records.length - 1]._nomor;
+            }
+          }
           $("sr-np-first").textContent = first;
-          $("sr-np-range").textContent = records.length
-            ? "rentang " +
-              first +
-              "  →  " +
-              lastN +
-              "  ·  " +
-              records.length +
-              " surat"
+          $("sr-np-range").textContent = n
+            ? "rentang " + first + "  →  " + lastN + "  ·  " + n + " surat"
             : "";
         }
 
@@ -1016,8 +1176,21 @@
                 })
             : ["(semua)"];
           assignNumbers();
-          if (viewIdx >= records.length) viewIdx = 0;
-          if (records.length) {
+          if (mode === "repeat")
+            units = distOrder.map(function (g) {
+              return {
+                label: g,
+                rows: records.filter(function (r) {
+                  return r._g === g;
+                }),
+              };
+            });
+          else
+            units = records.map(function (r) {
+              return { label: r._g, rows: [r], single: r };
+            });
+          if (viewIdx >= units.length) viewIdx = 0;
+          if (units.length) {
             ["sr-c3", "sr-c4"].forEach(function (id) {
               $(id).classList.remove("locked");
             });
@@ -1026,7 +1199,6 @@
           renderStats();
           renderTable();
           renderPreview();
-          updateFnPreview();
         }
 
         function renderStats() {
@@ -1034,21 +1206,39 @@
             $("sr-stats").innerHTML = "";
             return;
           }
-          var html =
-            '<div class="sr-stat"><b>' +
-            distOrder.length +
-            "</b>" +
-            (groupCol ? "Grup · file" : "File") +
-            "</div>" +
-            '<div class="sr-stat"><b>' +
-            records.length +
-            "</b>Surat</div>" +
-            '<div class="sr-stat"><b>' +
-            records[0]._nomor.split("/")[0] +
-            "–" +
-            records[records.length - 1]._nomor.split("/")[0] +
-            "</b>Rentang nomor</div>";
-          var totalCol = matchCol("TOTAL");
+          var html;
+          if (mode === "repeat") {
+            var f = groupNomor[distOrder[0]] || "",
+              l = groupNomor[distOrder[distOrder.length - 1]] || "";
+            html =
+              '<div class="sr-stat"><b>' +
+              distOrder.length +
+              "</b>Surat (per grup)</div>" +
+              '<div class="sr-stat"><b>' +
+              records.length +
+              "</b>Baris data</div>" +
+              '<div class="sr-stat"><b>' +
+              (f.split("/")[0] || "—") +
+              "–" +
+              (l.split("/")[0] || "—") +
+              "</b>Rentang nomor</div>";
+          } else {
+            html =
+              '<div class="sr-stat"><b>' +
+              distOrder.length +
+              "</b>" +
+              (groupCol ? "Grup · file" : "File") +
+              "</div>" +
+              '<div class="sr-stat"><b>' +
+              records.length +
+              "</b>Surat</div>" +
+              '<div class="sr-stat"><b>' +
+              records[0]._nomor.split("/")[0] +
+              "–" +
+              records[records.length - 1]._nomor.split("/")[0] +
+              "</b>Rentang nomor</div>";
+          }
+          var totalCol = matchCol("TOTAL", "INCENTIVE", "INSENTIF");
           if (totalCol) {
             var t = records.reduce(function (s, r) {
               return (
@@ -1094,13 +1284,15 @@
                 htmlEsc(r._g) +
                 ' <span class="cnt">— ' +
                 cnt +
-                " surat</span></td>";
+                (mode === "repeat" ? " baris" : " surat") +
+                "</span></td>";
               tb.appendChild(dr);
             }
             idx++;
+            var ui = mode === "repeat" ? distOrder.indexOf(r._g) : fi;
             var tr = document.createElement("tr");
             tr.className = "sr-clk";
-            tr.dataset.fi = fi;
+            tr.dataset.ui = ui;
             var td0 = document.createElement("td");
             td0.textContent = idx;
             tr.appendChild(td0);
@@ -1116,13 +1308,13 @@
               ed.addEventListener("input", function () {
                 if (!r._ov) r._ov = {};
                 r._ov[pl] = ed.textContent;
-                if (Number(tr.dataset.fi) === viewIdx) showLetter(viewIdx);
+                if (Number(tr.dataset.ui) === viewIdx) showLetter(viewIdx);
               });
               td.appendChild(ed);
               tr.appendChild(td);
             });
             tr.addEventListener("click", function () {
-              showLetter(fi);
+              showLetter(ui);
               $("sr-stage").scrollIntoView({
                 behavior: "smooth",
                 block: "nearest",
@@ -1135,7 +1327,7 @@
           $("sr-tbody")
             .querySelectorAll("tr.sr-clk")
             .forEach(function (r) {
-              r.classList.toggle("sr-active", Number(r.dataset.fi) === viewIdx);
+              r.classList.toggle("sr-active", Number(r.dataset.ui) === viewIdx);
             });
         }
 
@@ -1244,23 +1436,77 @@
             '<div class="dc-note">Template custom aktif — nilai di atas mengisi placeholder di template kamu. Pratinjau visual penuh tersedia untuk template bawaan.</div></div>'
           );
         }
+        function repeatCardHTML(u) {
+          var suratPl = placeholders.filter(function (pl) {
+            return mapping[pl].lvl === "surat";
+          });
+          var rowPl = placeholders.filter(function (pl) {
+            return mapping[pl].lvl === "baris";
+          });
+          var base = u.rows[0] || {};
+          var head = suratPl
+            .map(function (pl) {
+              return (
+                '<div class="dc-row"><span>${' +
+                htmlEsc(pl) +
+                "}</span><b>" +
+                htmlEsc(getValue(base, pl)) +
+                "</b></div>"
+              );
+            })
+            .join("");
+          var thead =
+            "<tr>" +
+            rowPl
+              .map(function (pl) {
+                return "<th>${" + htmlEsc(pl) + "}</th>";
+              })
+              .join("") +
+            "</tr>";
+          var tbody = u.rows
+            .map(function (r) {
+              return (
+                "<tr>" +
+                rowPl
+                  .map(function (pl) {
+                    return "<td>" + htmlEsc(getValue(r, pl)) + "</td>";
+                  })
+                  .join("") +
+                "</tr>"
+              );
+            })
+            .join("");
+          return (
+            '<div class="sr-datacard rep"><div class="dc-badge">1 surat · ' +
+            u.rows.length +
+            " baris tabel</div>" +
+            head +
+            '<table class="dc-tbl">' +
+            thead +
+            tbody +
+            "</table>" +
+            '<div class="dc-note">Mode baris berulang — tabel di atas mewakili baris yang ditulis di surat. Hasil Word mengikuti template kamu; kolom yang dipetakan ke grup akan menyatu vertikal.</div></div>'
+          );
+        }
         function showLetter(i) {
-          if (!records.length) return;
-          viewIdx = Math.max(0, Math.min(i, records.length - 1));
-          var r = records[viewIdx];
+          if (!units.length) return;
+          viewIdx = Math.max(0, Math.min(i, units.length - 1));
+          var u = units[viewIdx];
           $("sr-vcur").textContent = viewIdx + 1;
-          $("sr-vtot").textContent = records.length;
-          $("sr-vdist").textContent = r._g;
+          $("sr-vtot").textContent = units.length;
+          $("sr-vdist").textContent = u.label;
           $("sr-vprev").disabled = viewIdx <= 0;
-          $("sr-vnext").disabled = viewIdx >= records.length - 1;
-          $("sr-stage").innerHTML = isCustom
-            ? dataCardHTML(r)
-            : letterHTML(defaultView(r));
+          $("sr-vnext").disabled = viewIdx >= units.length - 1;
+          if (mode === "repeat") $("sr-stage").innerHTML = repeatCardHTML(u);
+          else
+            $("sr-stage").innerHTML = isCustom
+              ? dataCardHTML(u.single)
+              : letterHTML(defaultView(u.single));
           highlightRow();
         }
         function renderPreview() {
-          if (!records.length) return;
-          if (viewIdx >= records.length) viewIdx = 0;
+          if (!units.length) return;
+          if (viewIdx >= units.length) viewIdx = 0;
           showLetter(viewIdx);
         }
         $("sr-vprev").addEventListener("click", function () {
@@ -1276,9 +1522,9 @@
             toast("Belum ada data");
             return;
           }
-          if (isCustom) {
+          if (isCustom || mode === "repeat") {
             toast(
-              "Pratinjau semua (visual) hanya untuk template bawaan. Untuk custom, ekspor Word.",
+              "Pratinjau semua (visual) hanya untuk template bawaan mode 1-baris. Untuk lainnya, ekspor Word.",
             );
             return;
           }
@@ -1358,6 +1604,62 @@
             compression: "DEFLATE",
           });
         }
+        // ---- repeating mode (1 group = 1 letter, rows repeat) ----
+        function fillPerSurat(xml, base) {
+          placeholders.forEach(function (pl) {
+            if (mapping[pl].lvl === "surat")
+              xml = xml.split("${" + pl + "}").join(xmlEsc(getValue(base, pl)));
+          });
+          var tgl = ($("sr-tgl").value || "").trim();
+          if (tgl)
+            xml = xml
+              .split("Surakarta, 13 Juli 2026")
+              .join("Surakarta, " + xmlEsc(tgl));
+          return xml;
+        }
+        function fillRowCell(tc, r) {
+          placeholders.forEach(function (pl) {
+            tc = tc.split("${" + pl + "}").join(xmlEsc(getValue(r, pl)));
+          });
+          return tc;
+        }
+        function fillRepeating(groupRows) {
+          var base = groupRows[0] || {};
+          var info = findRepeatingRow(tplLetter);
+          if (!info)
+            return fillPerSurat(tplLetter, base).replace(/\$\{[^}<]+\}/g, "");
+          var before = fillPerSurat(tplLetter.slice(0, info.start), base);
+          var after = fillPerSurat(tplLetter.slice(info.end), base);
+          var parts = splitRow(info.xml);
+          var groupPl = placeholders.filter(function (pl) {
+            return (
+              mapping[pl].lvl === "surat" &&
+              groupCol &&
+              mapping[pl].src === groupCol
+            );
+          })[0];
+          var gIdx = -1;
+          if (groupPl)
+            parts.tcs.forEach(function (tc, ci) {
+              if (tc.indexOf("${" + groupPl + "}") >= 0) gIdx = ci;
+            });
+          var clones = groupRows.map(function (r, i) {
+            var tcs = parts.tcs.map(function (tc, ci) {
+              if (ci === gIdx) {
+                if (i === 0)
+                  return setVMerge(tc, "restart")
+                    .split("${" + groupPl + "}")
+                    .join(xmlEsc(getValue(r, groupPl)));
+                return setVMerge(tc, "continue")
+                  .split("${" + groupPl + "}")
+                  .join("");
+              }
+              return fillRowCell(tc, r);
+            });
+            return parts.open + tcs.join("") + parts.close;
+          });
+          return before + clones.join("") + after;
+        }
         $("sr-btn-word").addEventListener("click", function () {
           if (!records.length) {
             toast("Belum ada data");
@@ -1366,6 +1668,36 @@
           setProg(true);
           (activeZip ? Promise.resolve() : ensureTemplate())
             .then(function () {
+              // ---- COMBINED: all letters in one .docx ----
+              if (outMode === "combined") {
+                setBar(0.5, "Menyusun surat…");
+                var body =
+                  mode === "repeat"
+                    ? distOrder
+                        .map(function (g) {
+                          return fillRepeating(
+                            records.filter(function (r) {
+                              return r._g === g;
+                            }),
+                          );
+                        })
+                        .join(PB)
+                    : records
+                        .map(function (r) {
+                          return fillLetterXml(r);
+                        })
+                        .join(PB);
+                activeZip.file("word/document.xml", tplHead + body + tplTail);
+                var n = mode === "repeat" ? distOrder.length : records.length;
+                return activeZip
+                  .generateAsync({ type: "blob", compression: "DEFLATE" })
+                  .then(function (b) {
+                    dl(b, "Surat.docx");
+                    toast("Selesai — " + n + " surat dalam 1 file Word");
+                    setProg(false);
+                  });
+              }
+              // ---- SPLIT: one .docx per distributor/group, zipped ----
               var out = new JSZip(),
                 i = 0;
               (function next() {
@@ -1381,15 +1713,37 @@
                   list = records.filter(function (r) {
                     return r._g === d;
                   });
-                docxForGroup(list).then(function (bytes) {
-                  out.file(exportFileName(i, d) + ".docx", bytes);
-                  i++;
-                  setBar(
-                    i / distOrder.length,
-                    "Word · " + i + "/" + distOrder.length + " — " + d,
+                var fname = (groupCol ? safeFile(d) : "Semua_Surat") + ".docx";
+                if (mode === "repeat") {
+                  activeZip.file(
+                    "word/document.xml",
+                    tplHead + fillRepeating(list) + tplTail,
                   );
-                  setTimeout(next, 0);
-                });
+                  activeZip
+                    .generateAsync({
+                      type: "uint8array",
+                      compression: "DEFLATE",
+                    })
+                    .then(function (bytes) {
+                      out.file(fname, bytes);
+                      i++;
+                      setBar(
+                        i / distOrder.length,
+                        "Word · " + i + "/" + distOrder.length + " — " + d,
+                      );
+                      setTimeout(next, 0);
+                    });
+                } else {
+                  docxForGroup(list).then(function (bytes) {
+                    out.file(fname, bytes);
+                    i++;
+                    setBar(
+                      i / distOrder.length,
+                      "Word · " + i + "/" + distOrder.length + " — " + d,
+                    );
+                    setTimeout(next, 0);
+                  });
+                }
               })();
             })
             .catch(function (e) {
@@ -1397,9 +1751,17 @@
               setProg(false);
             });
         });
+        $("sr-outmode").addEventListener("change", function () {
+          outMode = this.value;
+          updateExportUI();
+        });
 
         // ---- pdf export (default only) ----
         $("sr-btn-pdf").addEventListener("click", function () {
+          if (mode === "repeat") {
+            toast("PDF nonaktif di mode baris berulang — ekspor Word.");
+            return;
+          }
           if (isCustom) {
             toast(
               "PDF hanya untuk template bawaan. Untuk custom, ekspor Word lalu Save as PDF.",
@@ -1455,7 +1817,10 @@
               .from(wrap)
               .outputPdf("blob")
               .then(function (blob) {
-                out.file(exportFileName(i, d) + ".pdf", blob);
+                out.file(
+                  (groupCol ? safeFile(d) : "Semua_Surat") + ".pdf",
+                  blob,
+                );
                 stage.removeChild(wrap);
                 i++;
                 setBar(
@@ -1475,7 +1840,8 @@
         function setProg(on) {
           $("sr-prog").classList.toggle("on", on);
           $("sr-btn-word").disabled = on;
-          $("sr-btn-pdf").disabled = on || isCustom;
+          if (on) $("sr-btn-pdf").disabled = true;
+          else updateExportUI();
           if (!on) setBar(0, "");
         }
         function setBar(f, l) {
